@@ -86,9 +86,9 @@ class Sidebar(QFrame):
 
         lt = QVBoxLayout(); lt.setSpacing(0)
         t1 = QLabel("TMS")
-        t1.setStyleSheet(f"color:{T.PRIMARY}; font-size:20px; font-weight:800;")
+        t1.setStyleSheet(f"color:{T.PRIMARY}; font-size:20px; font-weight:800; background:transparent;")
         t2 = QLabel("Tenant Management System")
-        t2.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:10px; letter-spacing:0.3px;")
+        t2.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:10px; letter-spacing:0.3px; background:transparent;")
         lt.addWidget(t1); lt.addWidget(t2)
         logo.addLayout(lt); logo.addStretch(1)
         root.addLayout(logo)
@@ -162,27 +162,23 @@ class Sidebar(QFrame):
 # ---------------------------------------------------------------------------
 
 class TopHeader(QFrame):
-    """Top bar: page title, breadcrumb, search, notification bell, avatar."""
+    """Top bar: page title, search, notification bell, avatar."""
 
-    def __init__(self, title: str = "Dashboard", breadcrumb: str = "Dashboard",
-                 user_initial: str = "A", parent=None):
+    def __init__(self, title: str = "Dashboard",
+                 user_initial: str = "", parent=None):
         super().__init__(parent)
         self.setFixedHeight(82)
-        self.setStyleSheet(f"background:{T.SURFACE}; border-bottom:1px solid {T.BORDER};")
+        self.setStyleSheet(f"background:{T.SURFACE}; border: none;")
 
         row = QHBoxLayout(self)
         row.setContentsMargins(28, 16, 28, 8)
         row.setSpacing(20)
 
         # Title + breadcrumb
-        title_col = QVBoxLayout(); title_col.setSpacing(2)
+        title_col = QVBoxLayout(); title_col.setSpacing(0)
         self.title_lbl = QLabel(title)
         self.title_lbl.setStyleSheet(f"color:{T.TEXT}; font-size:22px; font-weight:700;")
-        self.crumb_lbl = QLabel()
-        self.crumb_lbl.setStyleSheet("font-size:12px;")
-        self._set_crumb(breadcrumb)
         title_col.addWidget(self.title_lbl)
-        title_col.addWidget(self.crumb_lbl)
         row.addLayout(title_col)
         row.addStretch(1)
 
@@ -227,16 +223,8 @@ class TopHeader(QFrame):
         )
         row.addWidget(self.avatar)
 
-    def _set_crumb(self, breadcrumb: str):
-        self.crumb_lbl.setText(
-            f"<span style='color:{T.PRIMARY};'>Home</span>"
-            f" <span style='color:{T.TEXT_SUBTLE};'>/</span>"
-            f" <span style='color:{T.TEXT_MUTED};'>{breadcrumb}</span>"
-        )
-
-    def set_context(self, title: str, breadcrumb: str):
+    def set_context(self, title: str):
         self.title_lbl.setText(title)
-        self._set_crumb(breadcrumb)
 
     def set_user(self, initial: str):
         self.avatar.setText(initial.upper())

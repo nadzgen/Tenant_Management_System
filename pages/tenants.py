@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDate
 
 from theme import T
-from data.mock_data import TENANTS
+from database.repositories import get_tenants
 from widgets.components import (
     Card, section_title, styled_table, set_table_item,
     primary_button, ghost_button, danger_button, search_bar,
@@ -69,9 +69,17 @@ class TenantDialog(QDialog):
         self.contact_f = field("e.g. 09171234567", self.record.get("contact", ""))
         form.addRow(lbl2, self.contact_f)
 
-        lbl3 = QLabel("Age"); lbl3.setStyleSheet(label_style)
-        self.age_f = field("e.g. 28", str(self.record.get("age", "")))
-        form.addRow(lbl3, self.age_f)
+        lbl3 = QLabel("Birthdate"); lbl3.setStyleSheet(label_style)
+        self.birthdate_f = QDateEdit()
+        self.birthdate_f.setCalendarPopup(True)
+        self.birthdate_f.setFixedHeight(42)
+        self.birthdate_f.setStyleSheet(
+            f"QDateEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
+            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
+        )
+        date_str = self.record.get("birthdate", "1990-01-01")
+        self.birthdate_f.setDate(QDate.fromString(date_str, "yyyy-MM-dd"))
+        form.addRow(lbl3, self.birthdate_f)
 
         lbl4 = QLabel("Sex"); lbl4.setStyleSheet(label_style)
         self.sex_f = QComboBox(); self.sex_f.addItems(["Male", "Female", "Other"])
@@ -86,21 +94,6 @@ class TenantDialog(QDialog):
         )
         form.addRow(lbl4, self.sex_f)
 
-        lbl5 = QLabel("Move-in Date"); lbl5.setStyleSheet(label_style)
-        self.movein_f = QDateEdit()
-        self.movein_f.setCalendarPopup(True)
-        self.movein_f.setFixedHeight(42)
-        self.movein_f.setStyleSheet(
-            f"QDateEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
-            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
-        )
-        date_str = self.record.get("move_in", QDate.currentDate().toString("yyyy-MM-dd"))
-        self.movein_f.setDate(QDate.fromString(date_str, "yyyy-MM-dd"))
-        form.addRow(lbl5, self.movein_f)
-
-        lbl6 = QLabel("Assigned Room"); lbl6.setStyleSheet(label_style)
-        self.room_f = field("e.g. 101", self.record.get("room", ""))
-        form.addRow(lbl6, self.room_f)
 
         lay.addLayout(form)
 
@@ -122,10 +115,8 @@ class TenantDialog(QDialog):
     def _on_accept(self):
         self.record["name"]    = self.name_f.text().strip()
         self.record["contact"] = self.contact_f.text().strip()
-        self.record["age"]     = self.age_f.text().strip()
+        self.record["birthdate"] = self.birthdate_f.date().toString("yyyy-MM-dd")
         self.record["sex"]     = self.sex_f.currentText()
-        self.record["move_in"] = self.movein_f.date().toString("yyyy-MM-dd")
-        self.record["room"]    = self.room_f.text().strip()
         if not self.record["name"]:
             QMessageBox.warning(self, "Validation", "Full name is required.")
             return
@@ -139,7 +130,7 @@ class TenantDialog(QDialog):
 class TenantsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._data: list[dict] = list(TENANTS)  # local copy for runtime edits
+        self._data: list[dict] = get_tenants()  # local copy for runtime edits
         self._build()
         self._reload_table()
 
@@ -158,7 +149,7 @@ class TenantsPage(QWidget):
 
         # ── Toolbar ──────────────────────────────────────────────────────────
         toolbar = QHBoxLayout(); toolbar.setSpacing(12)
-        self._search = search_bar("Search by name, contact, or room…")
+        self._search = search_bar("Search by name or contact…")
         self._search.textChanged.connect(self._filter_table)
         toolbar.addWidget(self._search, 1)
 
@@ -177,7 +168,7 @@ class TenantsPage(QWidget):
 
         # Table
         self._tbl = styled_table(
-            ["Tenant ID", "Full Name", "Contact", "Age", "Sex", "Move-in Date", "Room"]
+            ["Tenant ID", "Full Name", "Contact", "Birthdate", "Sex", "Start Date", "End Date"]
         )
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -201,7 +192,7 @@ class TenantsPage(QWidget):
             if "id" not in t:
                 t["id"] = f"T-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
-            for col, key in enumerate(["id","name","contact","age","sex","move_in","room"]):
+            for col, key in enumerate(["id","name","contact","birthdate","sex","start_date","end_date"]):
                 set_table_item(self._tbl, r, col, str(t.get(key, "")))
         self._count_lbl.setText(f"{len(data)} tenant(s) found")
 
@@ -209,8 +200,7 @@ class TenantsPage(QWidget):
         q = query.lower()
         filtered = [t for t in self._data
                     if q in t["name"].lower()
-                    or q in t.get("contact","").lower()
-                    or q in t.get("room","").lower()]
+                    or q in t.get("contact","").lower()]
         self._reload_table(filtered)
 
     def _selected_index(self) -> int | None:

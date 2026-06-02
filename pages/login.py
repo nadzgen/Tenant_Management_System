@@ -29,11 +29,11 @@ class LoginPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(
-            "background: qlineargradient("
-            "x1:0, y1:0, x2:1, y2:1,"
-            "stop:0 #F0F4FF, stop:1 #EAF1FF);"
-        )
+
+        self.setAutoFillBackground(False)
+
+        self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #F0F4FF, stop:1 #EAF1FF);")
+
         self._build()
 
     # ── UI construction ─────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ class LoginPage(QWidget):
 
         h1 = QLabel("Welcome to TMS")
         h1.setAlignment(Qt.AlignCenter)
-        h1.setStyleSheet("color:white; font-size:28px; font-weight:800;")
+        h1.setStyleSheet("color:white; font-size:28px; font-weight:800; background:transparent;")
         h1.setWordWrap(True)
         lv.addWidget(h1)
 
@@ -79,7 +79,7 @@ class LoginPage(QWidget):
             "simple, elegant, and effortless."
         )
         h2.setAlignment(Qt.AlignCenter)
-        h2.setStyleSheet("color:rgba(255,255,255,0.75); font-size:13.5px;")
+        h2.setStyleSheet("color:rgba(255,255,255,0.75); font-size:13.5px; background:transparent;")
         h2.setWordWrap(True)
         lv.addWidget(h2)
         lv.addStretch(1)
@@ -96,7 +96,7 @@ class LoginPage(QWidget):
             dl.addWidget(IconLabel(icon, "white", 18), 0, Qt.AlignCenter)
             row.addWidget(dot)
             lbl = QLabel(text)
-            lbl.setStyleSheet("color:rgba(255,255,255,0.85); font-size:13px;")
+            lbl.setStyleSheet("color:rgba(255,255,255,0.85); font-size:13px; background:transparent;")
             row.addWidget(lbl); row.addStretch(1)
             lv.addLayout(row)
 
@@ -106,7 +106,7 @@ class LoginPage(QWidget):
         right = QWidget()
         right.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right.setFixedWidth(520)
-        right.setStyleSheet(f"background:{T.BG};")
+        right.setStyleSheet("background:transparent;")
         rv = QVBoxLayout(right)
         rv.setContentsMargins(56, 0, 56, 0)
         rv.setAlignment(Qt.AlignCenter)

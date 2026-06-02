@@ -4,10 +4,6 @@ main.py — Main Window & Application Entry Point
 Wires together the login screen, sidebar, header, and all page modules
 inside a single QMainWindow with a QStackedWidget.
 
-Run:
-    pip install pyside6
-    python main.py
-
 Demo credentials:  username: admin  /  password: admin
 """
 
@@ -59,7 +55,7 @@ class AppShell(QWidget):
 
         # Right column: header + pages
         right = QWidget()
-        right.setStyleSheet(f"background:{T.BG};")
+        right.setStyleSheet("background:transparent;")
         v = QVBoxLayout(right)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
@@ -68,7 +64,7 @@ class AppShell(QWidget):
         v.addWidget(self.header)
 
         self.stack = QStackedWidget()
-        self.stack.setStyleSheet(f"background:{T.BG};")
+        self.stack.setStyleSheet("background:transparent;")
         self._pages = [
             DashboardPage(),
             TenantsPage(),
@@ -91,7 +87,7 @@ class AppShell(QWidget):
         self.stack.setCurrentIndex(index)
         if 0 <= index < len(NAV_ITEMS):
             _, label, _ = NAV_ITEMS[index]
-            self.header.set_context(label, label)
+            self.header.set_context(label)
             self.sidebar.set_active(index)
 
     def set_user(self, username: str):
@@ -144,9 +140,9 @@ class MainWindow(QMainWindow):
             self,
             "Confirm Logout",
             "Are you sure you want to log out?",
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if ans == QMessageBox.Yes:
+        if ans == QMessageBox.StandardButton.Yes:
             # TODO(DB): Clear session / revoke token here
             self._login_page.clear_fields()
             self._root.setCurrentIndex(0)
@@ -158,7 +154,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setFont(QFont("Segoe UI", 10))           # Windows-native feel
+    app.setFont(QFont("Segoe UI", 10))           
     app.setStyle("Fusion")                        # cross-platform consistency
     win = MainWindow()
     win.show()

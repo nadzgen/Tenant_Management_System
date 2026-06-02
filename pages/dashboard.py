@@ -2,20 +2,21 @@
 pages/dashboard.py — Dashboard overview page
 =============================================
 Shows KPI cards, revenue chart, payment donut, and insight mini-cards.
-
-TODO(DB): Replace mock values with aggregated SQLite queries.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QScrollArea,
     QGridLayout, QFrame, QSizePolicy,
 )
 
 from theme import T
-from data.mock_data import REVENUE_MONTHLY, REVENUE_LABELS, PAYMENTS, TENANTS, ROOMS
+from database.repositories import (
+    get_dashboard_stats, get_payments,
+    get_revenue_monthly, get_revenue_labels,
+)
 from widgets.components import (
     Card, KPICard, MiniInsightCard, LineChart, DonutChart,
     section_title, IconLabel,
@@ -40,15 +41,28 @@ class DashboardPage(QWidget):
         root.setContentsMargins(28, 12, 28, 28)
         root.setSpacing(22)
 
+        # Load all stats from the database in one call
+        current_month = QDate.currentDate().toString("yyyy-MM")
+        stats = get_dashboard_stats(current_month)
+        revenue_monthly = get_revenue_monthly()
+        revenue_labels  = get_revenue_labels()
+        payments        = get_payments(current_month)
+
+        paid_count    = stats["paid_count"]
+        unpaid_count  = stats["unpaid_count"]
+        overdue_count = stats["overdue_count"]
+        vacant_units  = stats["vacant_units"]
+        active_tenants = stats["active_tenants"]
+        total_revenue  = stats["total_revenue"]
+
         # ── KPI row ─────────────────────────────────────────────────────────
-        # TODO(DB): SELECT SUM(amount) FROM payments WHERE status='Paid' AND month=current
         root.addWidget(section_title("Overview", "Today's property snapshot"))
         kpis = QHBoxLayout(); kpis.setSpacing(20)
-        kpis.addWidget(KPICard("Monthly Revenue",  "₱ 28,000", "wallet",
-                               T.PRIMARY, T.PRIMARY_SOFT, "12%", True, "Collected this month"))
-        kpis.addWidget(KPICard("Vacant Units", str(sum(1 for r in ROOMS if r["status"] == "Vacant")), "door",
+        kpis.addWidget(KPICard("Monthly Revenue",  f"₱ {int(total_revenue):,}", "wallet",
+                               T.PRIMARY, T.PRIMARY_SOFT, "", True, "Collected this month"))
+        kpis.addWidget(KPICard("Vacant Units", str(vacant_units), "door",
                                T.WARNING, T.WARNING_SOFT, "0", True, "Available for rent"))
-        kpis.addWidget(KPICard("Active Tenants", str(len(TENANTS)), "users",
+        kpis.addWidget(KPICard("Active Tenants", str(active_tenants), "users",
                                T.PURPLE, T.PURPLE_SOFT, "1", True, "Currently housed"))
         root.addLayout(kpis)
 
@@ -71,7 +85,7 @@ class DashboardPage(QWidget):
         )
         trend_head.addWidget(period)
         trend.body.addLayout(trend_head)
-        trend.body.addWidget(LineChart(REVENUE_MONTHLY, REVENUE_LABELS))
+        trend.body.addWidget(LineChart(revenue_monthly, revenue_labels))
         charts.addWidget(trend, 3)
         trend.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -83,10 +97,6 @@ class DashboardPage(QWidget):
         dh = QLabel("Payment Status")
         dh.setStyleSheet(f"color:{T.TEXT}; font-size:15px; font-weight:700;")
         donut.body.addWidget(dh)
-
-        paid_count    = sum(1 for p in PAYMENTS if p["status"] == "Paid")
-        unpaid_count  = sum(1 for p in PAYMENTS if p["status"] == "Unpaid")
-        overdue_count = sum(1 for p in PAYMENTS if p["status"] == "Overdue")
 
         d_row = QHBoxLayout(); d_row.setSpacing(16)
         d_row.addWidget(DonutChart([
@@ -123,15 +133,15 @@ class DashboardPage(QWidget):
         root.addLayout(charts)
 
         # ── Insight mini-cards ───────────────────────────────────────────────
+        total_p = (paid_count + unpaid_count + overdue_count) or 1
+        collection_rate = f"{round(paid_count / total_p * 100)}%"
+
         root.addWidget(section_title("Additional Insights"))
         insights = QGridLayout(); insights.setSpacing(20)
-        # TODO(DB): Calculate these from DB aggregates
         mini_cards = [
-            ("Average Rent per Unit",        "₱ 6,500", "wallet", T.PRIMARY, T.PRIMARY_SOFT),
-            ("Collection Rate",              "85%",     "chart",  T.SUCCESS, T.SUCCESS_SOFT),
-            ("Vacant Units",                 str(sum(1 for r in ROOMS if r["status"] == "Vacant")),
-             "door", T.WARNING, T.WARNING_SOFT),
-            ("Projected Revenue (Next Month)","₱ 30,000","users", T.PURPLE, T.PURPLE_SOFT),
+            ("Collection Rate",               collection_rate, "chart",  T.SUCCESS, T.SUCCESS_SOFT),
+            ("Vacant Units",                  str(vacant_units), "door", T.WARNING, T.WARNING_SOFT),
+            ("Projected Revenue (Next Month)","₱ 30,000",       "users", T.PURPLE,  T.PURPLE_SOFT),
         ]
         for i, args in enumerate(mini_cards):
             insights.addWidget(MiniInsightCard(*args), 0, i)
@@ -143,13 +153,14 @@ class DashboardPage(QWidget):
         from widgets.components import styled_table, set_table_item, set_badge_cell
         tbl = styled_table(["Payment ID", "Tenant", "Amount", "Due Date", "Status"])
         tbl.setMaximumHeight(240)
-        for row_data in PAYMENTS[-5:]:
+        for row_data in payments[-5:]:
             r = tbl.rowCount(); tbl.insertRow(r)
             set_table_item(tbl, r, 0, row_data["id"])
             set_table_item(tbl, r, 1, row_data["tenant"])
-            set_table_item(tbl, r, 2, f"₱ {row_data['amount']:,}")
+            set_table_item(tbl, r, 2, f"₱ {int(row_data['amount']):,}")
             set_table_item(tbl, r, 3, row_data["due"])
             set_badge_cell(tbl, r, 4, row_data["status"])
         recent.body.addWidget(tbl)
         root.addWidget(recent)
         root.addStretch(1)
+

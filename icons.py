@@ -4,7 +4,6 @@ icons.py — Inline SVG icon registry
 All icons are stored as SVG strings with a ``{c}`` placeholder for stroke
 colour.  Call :func:`make_icon` to get a ``QIcon`` at any size/colour.
 """
-
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QByteArray
@@ -189,4 +188,6 @@ def make_icon(name: str, color: str, size: int = 22) -> QIcon:
     p = QPainter(pm)
     renderer.render(p)
     p.end()
+
     return QIcon(pm)
+    

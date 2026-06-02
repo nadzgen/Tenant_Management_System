@@ -64,6 +64,9 @@ class IconLabel(QLabel):
 
     def __init__(self, name: str, color: str, size: int = 22, parent=None):
         super().__init__(parent)
+
+        self.setStyleSheet("background:transparent; border:none;")
+
         self.setPixmap(make_icon(name, color, size).pixmap(size, size))
         self.setFixedSize(size, size)
 
@@ -103,8 +106,7 @@ class StatusBadge(QLabel):
         "Unpaid":      (T.WARNING, T.WARNING_SOFT),
         "Overdue":     (T.DANGER,  T.DANGER_SOFT),
         "Occupied":    (T.SUCCESS, T.SUCCESS_SOFT),
-        "Vacant":      (T.PRIMARY, T.PRIMARY_SOFT),
-        "Maintenance": (T.WARNING, T.WARNING_SOFT),
+        "Vacant":      (T.PRIMARY, T.PRIMARY_SOFT)
     }
 
     def __init__(self, status: str, parent=None):
@@ -247,19 +249,30 @@ class DonutChart(QWidget):
         rect = QRectF((w - size) / 2, (h - size) / 2, size, size)
         total = sum(v for _, v, _ in self.segments) or 1
         start = 90 * 16
+        
+        # Calculate midpoint radius of the donut ring
+        # Outer radius = 0.5 * size
+        # Inner radius (hole) = 0.55 * size / 2 = 0.275 * size
+        # Midpoint = (0.5 + 0.275) / 2 = 0.3875
+        label_radius = size * 0.3875
+        font_size = max(8, min(12, int(size * 0.045)))
+        p.setFont(QFont("Segoe UI", font_size, QFont.Bold))
+
         for _, value, color in self.segments:
             span = -int(360 * 16 * value / total)
             p.setBrush(QColor(color)); p.setPen(Qt.NoPen)
             p.drawPie(rect, start, span)
-            mid_angle = (start + span / 2) / 16
-            rad = math.radians(mid_angle)
-            r = size * 0.34
-            cx = rect.center().x() + r * math.cos(rad)
-            cy = rect.center().y() - r * math.sin(rad)
-            p.setPen(QColor("white"))
-            p.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            pct = round(value / total * 100)
-            p.drawText(QRectF(cx - 25, cy - 10, 50, 20), Qt.AlignCenter, f"{pct}%")
+            
+            if value > 0:
+                pct = (value / total) * 100
+                if pct >= 5:  # Hide labels for very small slices
+                    mid_angle = (start + span / 2) / 16
+                    rad = math.radians(mid_angle)
+                    cx = rect.center().x() + label_radius * math.cos(rad)
+                    cy = rect.center().y() - label_radius * math.sin(rad)
+                    
+                    p.setPen(QColor("white"))
+                    p.drawText(QRectF(cx - 25, cy - 10, 50, 20), Qt.AlignCenter, f"{round(pct)}%")
             start += span
 
         hole = size * 0.55
@@ -273,51 +286,106 @@ class DonutChart(QWidget):
 # ---------------------------------------------------------------------------
 
 def styled_table(columns: list[str]) -> QTableWidget:
-    """Create a pre-styled, read-only table with the given column headers."""
+    """Create a pre‑styled, read‑only table with uniform visual layout."""
+
+    # Base table
     tbl = QTableWidget(0, len(columns))
     tbl.setHorizontalHeaderLabels(columns)
+
+    # ==== Interaction ====
     tbl.setEditTriggers(QTableWidget.NoEditTriggers)
     tbl.setSelectionBehavior(QTableWidget.SelectRows)
+    tbl.setSelectionMode(QTableWidget.SingleSelection)
+
+    # ==== Row / column geometry ====
     tbl.setAlternatingRowColors(True)
     tbl.verticalHeader().setVisible(False)
+    tbl.verticalHeader().setDefaultSectionSize(44)          # uniform row height
     tbl.setShowGrid(False)
-    tbl.horizontalHeader().setStretchLastSection(True)
-    tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+
+    # Size each column to its contents, then stretch the last column for balance
+    header = tbl.horizontalHeader()
+    for i in range(tbl.columnCount()):
+        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+    header.setMinimumSectionSize(80)  # ensure columns aren't too narrow
+    header.setStretchLastSection(True)
+    header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    header.setHighlightSections(False)
+
+
+
+    # ==== Scrolling ====
+    tbl.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
+    tbl.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
+
+    # ==== Focus ====
+    tbl.setFocusPolicy(Qt.NoFocus)
+    tbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
     tbl.setStyleSheet(f"""
         QTableWidget {{
-            background:{T.SURFACE}; border:none;
+            background:{T.SURFACE};
+            border:none;
             alternate-background-color:{T.BG};
-            gridline-color:{T.DIVIDER};
-            color:{T.TEXT}; font-size:13px;
+            color:{T.TEXT};
+            font-size:13px;
         }}
-        QTableWidget::item {{ padding:10px 14px; border:none; }}
+
+        QTableWidget::item {{
+            padding-left:16px;
+            padding-right:16px;
+            border-bottom:1px solid {T.BORDER};
+        }}
+
         QTableWidget::item:selected {{
-            background:{T.PRIMARY_SOFT}; color:{T.PRIMARY};
+            background:{T.PRIMARY_SOFT};
+            color:{T.PRIMARY};
         }}
+
         QHeaderView::section {{
-            background:{T.BG}; color:{T.TEXT_MUTED};
-            font-size:11px; font-weight:700;
-            letter-spacing:0.6px; padding:10px 14px;
-            border:none; border-bottom:2px solid {T.BORDER};
+            background:{T.BG};
+            color:{T.TEXT_MUTED};
+            font-size:11px;
+            font-weight:700;
+            padding-left:16px;
+            padding-right:16px;
+            padding-top:12px;
+            padding-bottom:12px;
+            border:none;
+            border-bottom:1px solid {T.BORDER};
         }}
     """)
-    tbl.setFocusPolicy(Qt.NoFocus)
+
     return tbl
 
 
 def set_table_item(tbl: QTableWidget, row: int, col: int, text: str):
     item = QTableWidgetItem(str(text))
-    item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+    item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     tbl.setItem(row, col, item)
 
 
 def set_badge_cell(tbl: QTableWidget, row: int, col: int, status: str):
     """Embed a StatusBadge widget inside a table cell."""
+
     badge = StatusBadge(status)
-    wrap = QWidget(); lay = QHBoxLayout(wrap)
-    lay.setContentsMargins(8, 4, 8, 4)
-    lay.addWidget(badge, 0, Qt.AlignLeft)
+
+    wrap = QWidget()
+    wrap.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    lay = QHBoxLayout(wrap)
+    # Center the badge within the cell with balanced horizontal margins
+    lay.setContentsMargins(16, 0, 16, 0)
+    lay.setAlignment(Qt.AlignCenter)
+    
+    lay.addWidget(badge)
+
     tbl.setCellWidget(row, col, wrap)
+
+    # Programmatically ensure the column header is also centered
+    header_item = tbl.horizontalHeaderItem(col)
+    if header_item:
+        header_item.setTextAlignment(Qt.AlignCenter)
 
 
 # ---------------------------------------------------------------------------

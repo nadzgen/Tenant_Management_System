@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from theme import T
-from data.mock_data import PAYMENTS
+from database.repositories import get_payments
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar, KPICard,
@@ -80,6 +80,10 @@ class PaymentDialog(QDialog):
         lbl3 = QLabel("Amount (₱)"); lbl3.setStyleSheet(lbl_style)
         self.amount_f = field("e.g. 5000", self.record.get("amount",""))
         form.addRow(lbl3, self.amount_f)
+        
+        lbl_bm = QLabel("Billing Month"); lbl_bm.setStyleSheet(lbl_style)
+        self.bmonth_f = field("YYYY-MM", self.record.get("billing_month", QDate.currentDate().toString("yyyy-MM")))
+        form.addRow(lbl_bm, self.bmonth_f)
 
         lbl4 = QLabel("Due Date"); lbl4.setStyleSheet(lbl_style)
         self.due_f = date_edit(self.record.get("due",""))
@@ -120,12 +124,13 @@ class PaymentDialog(QDialog):
         lay.addWidget(btns)
 
     def _on_accept(self):
-        self.record["tenant_id"] = self.tid_f.text().strip()
-        self.record["tenant"]    = self.tname_f.text().strip()
-        self.record["amount"]    = self.amount_f.text().strip()
-        self.record["due"]       = self.due_f.date().toString("yyyy-MM-dd")
-        self.record["paid_on"]   = self.paid_f.date().toString("yyyy-MM-dd")
-        self.record["status"]    = self.status_f.currentText()
+        self.record["tenant_id"]     = self.tid_f.text().strip()
+        self.record["tenant"]        = self.tname_f.text().strip()
+        self.record["amount"]        = self.amount_f.text().strip()
+        self.record["billing_month"] = self.bmonth_f.text().strip()
+        self.record["due"]           = self.due_f.date().toString("yyyy-MM-dd")
+        self.record["paid_on"]       = self.paid_f.date().toString("yyyy-MM-dd")
+        self.record["status"]        = self.status_f.currentText()
         if not self.record["tenant"]:
             QMessageBox.warning(self, "Validation", "Tenant name is required.")
             return
@@ -139,7 +144,8 @@ class PaymentDialog(QDialog):
 class PaymentsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._data: list[dict] = list(PAYMENTS)
+        self.current_month = QDate.currentDate().toString("yyyy-MM")
+        self._data: list[dict] = get_payments(self.current_month)
         self._build()
         self._reload_table()
 
@@ -157,19 +163,24 @@ class PaymentsPage(QWidget):
         root.addWidget(section_title("Payment Tracking", "Monitor rent payments across all tenants"))
 
         # ── KPI summary ──────────────────────────────────────────────────────
-        # TODO(DB): SELECT status, COUNT(*), SUM(amount) FROM payments GROUP BY status
-        paid_amt    = sum(p["amount"] for p in self._data if p["status"] == "Paid")
-        unpaid_amt  = sum(p["amount"] for p in self._data if p["status"] == "Unpaid")
-        overdue_amt = sum(p["amount"] for p in self._data if p["status"] == "Overdue")
-        kpi_row = QHBoxLayout(); kpi_row.setSpacing(20)
-        kpi_row.addWidget(KPICard("Total Collected",  f"₱ {paid_amt:,}",    "wallet", T.SUCCESS, T.SUCCESS_SOFT, "", True,  "Paid payments"))
-        kpi_row.addWidget(KPICard("Pending Amount",   f"₱ {unpaid_amt:,}",  "wallet", T.WARNING, T.WARNING_SOFT, "", False, "Not yet paid"))
-        kpi_row.addWidget(KPICard("Overdue Amount",   f"₱ {overdue_amt:,}", "wallet", T.DANGER,  T.DANGER_SOFT,  "", False, "Past due date"))
-        root.addLayout(kpi_row)
+        self.kpi_row = QHBoxLayout(); self.kpi_row.setSpacing(20)
+        root.addLayout(self.kpi_row)
+        self._update_kpis()
 
         # ── Filter row ───────────────────────────────────────────────────────
         card = Card(padding=20)
         filter_row = QHBoxLayout(); filter_row.setSpacing(12)
+        
+        self._month_filter = QLineEdit(self.current_month)
+        self._month_filter.setPlaceholderText("YYYY-MM")
+        self._month_filter.setFixedWidth(90)
+        self._month_filter.setFixedHeight(42)
+        self._month_filter.setStyleSheet(
+            f"QLineEdit {{ background:{T.SURFACE}; border:1px solid {T.BORDER};"
+            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
+        )
+        self._month_filter.editingFinished.connect(self._change_month)
+        filter_row.addWidget(self._month_filter)
         self._search = search_bar("Search by tenant name or payment ID…")
         self._search.textChanged.connect(self._filter_table)
         filter_row.addWidget(self._search, 1)
@@ -197,7 +208,7 @@ class PaymentsPage(QWidget):
         card.body.addLayout(filter_row)
 
         self._tbl = styled_table(
-            ["Payment ID", "Tenant ID", "Tenant Name", "Amount", "Due Date", "Paid On", "Status"]
+            ["Payment ID", "Billing Month", "Tenant ID", "Tenant Name", "Amount", "Type", "Due Date", "Paid On", "Status"]
         )
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -212,6 +223,28 @@ class PaymentsPage(QWidget):
 
     # ── Table helpers ─────────────────────────────────────────────────────────
 
+    def _update_kpis(self):
+        # Clear existing
+        while self.kpi_row.count():
+            item = self.kpi_row.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        paid_amt    = sum(p["amount"] for p in self._data if p["status"] == "Paid")
+        unpaid_amt  = sum(p["amount"] for p in self._data if p["status"] == "Unpaid")
+        overdue_amt = sum(p["amount"] for p in self._data if p["status"] == "Overdue")
+        self.kpi_row.addWidget(KPICard("Total Collected",  f"₱ {int(paid_amt):,}",    "wallet", T.SUCCESS, T.SUCCESS_SOFT, "", True,  "Paid this month"))
+        self.kpi_row.addWidget(KPICard("Pending Amount",   f"₱ {int(unpaid_amt):,}",  "wallet", T.WARNING, T.WARNING_SOFT, "", False, "Not yet paid this month"))
+        self.kpi_row.addWidget(KPICard("Overdue Amount",   f"₱ {int(overdue_amt):,}", "wallet", T.DANGER,  T.DANGER_SOFT,  "", False, "Total past due"))
+
+    def _change_month(self):
+        new_month = self._month_filter.text().strip()
+        if len(new_month) == 7 and "-" in new_month:
+            self.current_month = new_month
+            self._data = get_payments(self.current_month)
+            self._update_kpis()
+            self._apply_filters()
+
     def _reload_table(self, rows: list[dict] | None = None):
         data = rows if rows is not None else self._data
         self._tbl.setRowCount(0)
@@ -220,12 +253,14 @@ class PaymentsPage(QWidget):
                 p["id"] = f"P-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
             set_table_item(self._tbl, r, 0, p["id"])
-            set_table_item(self._tbl, r, 1, p.get("tenant_id",""))
-            set_table_item(self._tbl, r, 2, p["tenant"])
-            set_table_item(self._tbl, r, 3, f"₱ {int(p['amount']):,}")
-            set_table_item(self._tbl, r, 4, p["due"])
-            set_table_item(self._tbl, r, 5, p.get("paid_on","—"))
-            set_badge_cell(self._tbl, r, 6, p["status"])
+            set_table_item(self._tbl, r, 1, p.get("billing_month",""))
+            set_table_item(self._tbl, r, 2, p.get("tenant_id",""))
+            set_table_item(self._tbl, r, 3, p["tenant"])
+            set_table_item(self._tbl, r, 4, f"₱ {int(p['amount']):,}")
+            set_table_item(self._tbl, r, 5, p.get("type","—"))
+            set_table_item(self._tbl, r, 6, p["due"])
+            set_table_item(self._tbl, r, 7, p.get("paid_on","—"))
+            set_badge_cell(self._tbl, r, 8, p["status"])
         self._count_lbl.setText(f"{len(data)} payment record(s)")
 
     def _apply_filters(self):

@@ -26,9 +26,7 @@ from widgets.components import (
 
 def _lbl(text: str, muted: bool = False) -> QLabel:
     l = QLabel(text)
-    style = f"color:{T.TEXT_MUTED}; font-size:12.5px;" if muted else \
-            f"color:{T.TEXT}; font-size:13px; font-weight:600;"
-    l.setStyleSheet(style)
+    l.setStyleSheet(f"color:{T.TEXT};")
     return l
 
 
@@ -155,10 +153,7 @@ class SettingsPage(QWidget):
         )
         body3.addWidget(theme_cb)
 
-        body3.addWidget(_lbl("Language"))
-        lang_cb = QComboBox(); lang_cb.addItems(["English (Default)", "Filipino (Coming Soon)"])
-        lang_cb.setFixedHeight(44); lang_cb.setStyleSheet(theme_cb.styleSheet())
-        body3.addWidget(lang_cb)
+
         right.addWidget(card3)
 
         # ── Database ────────────────────────────────────────────────────────────
@@ -200,21 +195,7 @@ class SettingsPage(QWidget):
         body5.addLayout(exp_row)
         right.addWidget(card5)
 
-        # ── Preferences ───────────────────────────────────────────────────────
-        card6, body6 = _section_card("Preferences", "gear", T.TEXT_MUTED, T.DIVIDER)
-        for label in [
-            "Send payment reminders",
-            "Show overdue alerts on startup",
-            "Auto-backup on exit",
-        ]:
-            row = QHBoxLayout(); row.setSpacing(12)
-            cb = QCheckBox()
-            cb.setStyleSheet(f"color:{T.TEXT}; font-size:13px;")
-            row.addWidget(cb)
-            lbl = QLabel(label); lbl.setStyleSheet(f"color:{T.TEXT}; font-size:13px;")
-            row.addWidget(lbl); row.addStretch(1)
-            body6.addLayout(row)
-        right.addWidget(card6)
+
 
         left.addStretch(1); right.addStretch(1)
         cols.addLayout(left, 1); cols.addLayout(right, 1)

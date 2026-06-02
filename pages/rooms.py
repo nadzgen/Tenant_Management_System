@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from theme import T
-from data.mock_data import ROOMS
+from database.repositories import get_rooms
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar,
@@ -89,7 +89,7 @@ class RoomDialog(QDialog):
         form.addRow(lbl4, self.rent_f)
 
         lbl5 = QLabel("Status"); lbl5.setStyleSheet(lbl_style)
-        self.status_f = combo(["Occupied","Vacant","Maintenance"], self.record.get("status","Vacant"))
+        self.status_f = combo(["Full","Partially Occupied","Vacant"], self.record.get("status","Vacant"))
         form.addRow(lbl5, self.status_f)
 
         lay.addLayout(form)
@@ -128,7 +128,7 @@ class RoomDialog(QDialog):
 class RoomsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._data: list[dict] = list(ROOMS)
+        self._data: list[dict] = get_rooms()
         self._build()
         self._reload_table()
 
@@ -150,11 +150,9 @@ class RoomsPage(QWidget):
         total    = len(self._data)
         occupied = sum(1 for r in self._data if r["status"] == "Occupied")
         vacant   = sum(1 for r in self._data if r["status"] == "Vacant")
-        maint    = sum(1 for r in self._data if r["status"] == "Maintenance")
         kpi_row.addWidget(KPICard("Total Rooms",    str(total),    "door",   T.PRIMARY, T.PRIMARY_SOFT, "",  True, "All units"))
         kpi_row.addWidget(KPICard("Occupied",       str(occupied), "users",  T.SUCCESS, T.SUCCESS_SOFT, "",  True, "Tenants housed"))
         kpi_row.addWidget(KPICard("Vacant",         str(vacant),   "door",   T.WARNING, T.WARNING_SOFT, "",  False,"Available now"))
-        kpi_row.addWidget(KPICard("Under Maintenance",str(maint),  "gear",   T.DANGER,  T.DANGER_SOFT,  "",  False,"Currently offline"))
         root.addLayout(kpi_row)
 
         # ── Toolbar ───────────────────────────────────────────────────────────
