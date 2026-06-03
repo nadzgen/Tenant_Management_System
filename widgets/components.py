@@ -354,6 +354,52 @@ def styled_table(columns: list[str]) -> QTableWidget:
             border:none;
             border-bottom:1px solid {T.BORDER};
         }}
+
+        /* Modern Scrollbar Vertical */
+        QScrollBar:vertical {{
+            border: none;
+            background: transparent;
+            width: 8px;
+            margin: 0px 0px 0px 0px;
+        }}
+        QScrollBar::handle:vertical {{
+            background: {T.TEXT_SUBTLE};
+            min-height: 30px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: {T.TEXT_MUTED};
+        }}
+        QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical {{
+            height: 0px;
+            background: none;
+        }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+            background: none;
+        }}
+
+        /* Modern Scrollbar Horizontal */
+        QScrollBar:horizontal {{
+            border: none;
+            background: transparent;
+            height: 8px;
+            margin: 0px 0px 0px 0px;
+        }}
+        QScrollBar::handle:horizontal {{
+            background: {T.TEXT_SUBTLE};
+            min-width: 30px;
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:horizontal:hover {{
+            background: {T.TEXT_MUTED};
+        }}
+        QScrollBar::sub-line:horizontal, QScrollBar::add-line:horizontal {{
+            width: 0px;
+            background: none;
+        }}
+        QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+            background: none;
+        }}
     """)
 
     return tbl
