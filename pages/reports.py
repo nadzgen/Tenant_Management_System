@@ -27,6 +27,8 @@ class ReportsPage(QWidget):
         super().__init__(parent)
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)

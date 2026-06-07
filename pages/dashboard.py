@@ -28,9 +28,8 @@ class DashboardPage(QWidget):
         super().__init__(parent)
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
@@ -148,12 +147,14 @@ class DashboardPage(QWidget):
         root.addLayout(insights)
 
         # ── Recent activity ──────────────────────────────────────────────────
-        root.addWidget(section_title("Recent Payments", "Last 5 recorded payments"))
+        root.addWidget(section_title("Recent Payments", "Last 10 recorded payments"))
         recent = Card(padding=20)
         from widgets.components import styled_table, set_table_item, set_badge_cell
         tbl = styled_table(["Payment ID", "Tenant", "Amount", "Due Date", "Status"])
-        tbl.setMaximumHeight(240)
-        for row_data in payments[-5:]:
+        tbl.setMaximumHeight(400)
+        # Sort payments by most recent date (paid_on) descending, fallback to due date
+        sorted_payments = sorted(payments, key=lambda p: p.get("paid_on", p.get("due", "")), reverse=True)
+        for row_data in sorted_payments[:10]:
             r = tbl.rowCount(); tbl.insertRow(r)
             set_table_item(tbl, r, 0, row_data["id"])
             set_table_item(tbl, r, 1, row_data["tenant"])

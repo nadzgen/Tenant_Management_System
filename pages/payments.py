@@ -81,9 +81,12 @@ class PaymentDialog(QDialog):
         self.amount_f = field("e.g. 5000", self.record.get("amount",""))
         form.addRow(lbl3, self.amount_f)
         
-        lbl_bm = QLabel("Billing Month"); lbl_bm.setStyleSheet(lbl_style)
-        self.bmonth_f = field("YYYY-MM", self.record.get("billing_month", QDate.currentDate().toString("yyyy-MM")))
-        form.addRow(lbl_bm, self.bmonth_f)
+        lbl_bm = QLabel("Month"); lbl_bm.setStyleSheet(lbl_style)
+        self.month_f = QLineEdit(); self.month_f.setPlaceholderText("YYYY-MM"); self.month_f.setFixedHeight(42);
+        self.month_f.setStyleSheet(
+            f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
+        ); self.month_f.setReadOnly(True);
+        form.addRow(lbl_bm, self.month_f)
 
         lbl4 = QLabel("Due Date"); lbl4.setStyleSheet(lbl_style)
         self.due_f = date_edit(self.record.get("due",""))
@@ -127,7 +130,6 @@ class PaymentDialog(QDialog):
         self.record["tenant_id"]     = self.tid_f.text().strip()
         self.record["tenant"]        = self.tname_f.text().strip()
         self.record["amount"]        = self.amount_f.text().strip()
-        self.record["billing_month"] = self.bmonth_f.text().strip()
         self.record["due"]           = self.due_f.date().toString("yyyy-MM-dd")
         self.record["paid_on"]       = self.paid_f.date().toString("yyyy-MM-dd")
         self.record["status"]        = self.status_f.currentText()
@@ -152,6 +154,8 @@ class PaymentsPage(QWidget):
     def _build(self):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
@@ -208,7 +212,7 @@ class PaymentsPage(QWidget):
         card.body.addLayout(filter_row)
 
         self._tbl = styled_table(
-            ["Payment ID", "Billing Month", "Tenant ID", "Tenant Name", "Amount", "Type", "Due Date", "Paid On", "Status"]
+            ["Payment ID", "Month", "Tenant ID", "Tenant Name", "Amount", "Type", "Due Date", "Paid On", "Status"]
         )
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -253,7 +257,7 @@ class PaymentsPage(QWidget):
                 p["id"] = f"P-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
             set_table_item(self._tbl, r, 0, p["id"])
-            set_table_item(self._tbl, r, 1, p.get("billing_month",""))
+            set_table_item(self._tbl, r, 1, p["due"][:7] if p.get("due") else "")
             set_table_item(self._tbl, r, 2, p.get("tenant_id",""))
             set_table_item(self._tbl, r, 3, p["tenant"])
             set_table_item(self._tbl, r, 4, f"₱ {int(p['amount']):,}")

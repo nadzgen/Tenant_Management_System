@@ -56,10 +56,10 @@ def get_rooms() -> List[Dict[str, Any]]:
         print(f"Warning (get_rooms): {e}")
         return []
 
-def get_payments(billing_month: str = None) -> List[Dict[str, Any]]:
+def get_payments(month: str = None) -> List[Dict[str, Any]]:
     """
     Fetches payments by joining the Rental and Tenant tables to get tenant names.
-    If billing_month is provided, returns payments for that month PLUS all overdue payments.
+    If month is provided, returns payments for that month PLUS all overdue payments.
     """
     query = """
         SELECT 
@@ -71,16 +71,15 @@ def get_payments(billing_month: str = None) -> List[Dict[str, Any]]:
             p.due_date as due,
             COALESCE(p.payment_date, '') as paid_on,
             COALESCE(p.payment_type, '') as type,
-            p.status,
-            p.billing_month
+            p.status
         FROM Payment p
         JOIN Rental r ON p.rental_id = r.RentalID
         JOIN Tenant t ON r.tenant_id = t.TenantID
     """
     params = []
-    if billing_month:
-        query += " WHERE p.billing_month = ? OR p.status = 'Overdue'"
-        params.append(billing_month)
+    if month:
+        query += " WHERE strftime('%Y-%m', p.due_date) = ? OR p.status = 'Overdue'"
+        params.append(month)
         
     try:
         with get_connection() as conn:
@@ -91,7 +90,7 @@ def get_payments(billing_month: str = None) -> List[Dict[str, Any]]:
         print(f"Warning (get_payments): {e}")
         return []
 
-def get_dashboard_stats(billing_month: str = None) -> Dict[str, Any]:
+def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
     """
     Pre-computes and returns all statistics required by the dashboard and reports pages.
     Replaces python-side len() and sum() logic.
@@ -131,13 +130,13 @@ def get_dashboard_stats(billing_month: str = None) -> Dict[str, Any]:
             if row: stats["occupied_rooms"] = row[0]
             
             # Payment stats
-            if billing_month:
+            if month:
                 cursor.execute("""
                     SELECT status, COUNT(*), SUM(amount) 
                     FROM Payment 
-                    WHERE billing_month = ?
+                    WHERE strftime('%Y-%m', due_date) = ?
                     GROUP BY status
-                """, (billing_month,))
+                """, (month,))
             else:
                 cursor.execute("SELECT status, COUNT(*), SUM(amount) FROM Payment GROUP BY status")
                 
@@ -152,11 +151,10 @@ def get_dashboard_stats(billing_month: str = None) -> Dict[str, Any]:
                 elif status == 'Overdue':
                     stats["overdue_count"] = count
                     
-            if billing_month:
-                # Override overdue_count to always reflect global overdue payments
-                cursor.execute("SELECT COUNT(*) FROM Payment WHERE status = 'Overdue'")
-                row = cursor.fetchone()
-                if row: stats["overdue_count"] = row[0]
+            # Override overdue_count to always reflect global overdue payments
+            cursor.execute("SELECT COUNT(*) FROM Payment WHERE status = 'Overdue'")
+            row = cursor.fetchone()
+            if row: stats["overdue_count"] = row[0]
                     
     except sqlite3.OperationalError as e:
         print(f"Warning (get_dashboard_stats): {e}")
