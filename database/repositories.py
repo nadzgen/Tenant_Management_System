@@ -44,7 +44,11 @@ def get_rooms() -> List[Dict[str, Any]]:
             room_type as type,
             capacity,
             monthly_rent as rent,
-            CASE WHEN occupied_slots > 0 THEN 'Occupied' ELSE 'Vacant' END as status
+            CASE 
+                WHEN occupied_slots = 0 THEN 'Vacant'
+                WHEN occupied_slots < capacity THEN 'Partially Occupied'
+                ELSE 'Full'
+            END as status
         FROM Room
     """
     try:

@@ -106,6 +106,8 @@ class StatusBadge(QLabel):
         "Unpaid":      (T.WARNING, T.WARNING_SOFT),
         "Overdue":     (T.DANGER,  T.DANGER_SOFT),
         "Occupied":    (T.SUCCESS, T.SUCCESS_SOFT),
+        "Full":        (T.SUCCESS, T.SUCCESS_SOFT),
+        "Partially Occupied": (T.PURPLE, T.PURPLE_SOFT),
         "Vacant":      (T.PRIMARY, T.PRIMARY_SOFT)
     }
 

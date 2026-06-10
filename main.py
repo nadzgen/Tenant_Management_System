@@ -24,6 +24,7 @@ from icons import make_icon
 # Pages
 from pages.login import LoginPage
 from pages.dashboard import DashboardPage
+from pages.onboarding import OnboardingPage
 from pages.tenants import TenantsPage
 from pages.rooms import RoomsPage
 from pages.payments import PaymentsPage
@@ -67,6 +68,7 @@ class AppShell(QWidget):
         self.stack.setStyleSheet("background:transparent;")
         self._pages = [
             DashboardPage(),
+            OnboardingPage(),
             TenantsPage(),
             RoomsPage(),
             PaymentsPage(),
