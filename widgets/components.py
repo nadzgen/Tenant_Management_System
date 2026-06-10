@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import List
 
-from PySide6.QtCore import Qt, QRectF, QPointF, QSize
+from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal
 from PySide6.QtGui import (
     QColor, QPainter, QPainterPath, QPen, QBrush, QFont,
     QLinearGradient,
@@ -303,12 +303,11 @@ def styled_table(columns: list[str]) -> QTableWidget:
     tbl.verticalHeader().setDefaultSectionSize(44)          # uniform row height
     tbl.setShowGrid(False)
 
-    # Size each column to its contents, then stretch the last column for balance
+    # Balance column widths evenly for a uniform appearance
     header = tbl.horizontalHeader()
     for i in range(tbl.columnCount()):
-        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(i, QHeaderView.Stretch)
     header.setMinimumSectionSize(80)  # ensure columns aren't too narrow
-    header.setStretchLastSection(True)
     header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     header.setHighlightSections(False)
 
@@ -529,3 +528,78 @@ def danger_button(label: str, icon_name: str = "") -> QPushButton:
         QPushButton:hover {{ background:{T.DANGER}; color:white; }}
     """)
     return btn
+
+
+# ---------------------------------------------------------------------------
+# Pagination Control
+# ---------------------------------------------------------------------------
+
+class PaginationControl(QWidget):
+    page_changed = Signal(int)
+    items_per_page_changed = Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_page = 1
+        self.total_pages = 1
+        self.items_per_page = 20
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(12)
+        
+        self.lbl_info = QLabel("Page 1 of 1")
+        self.lbl_info.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:13px; font-weight:500;")
+        
+        btn_style = f"""
+            QPushButton {{
+                background: {T.SURFACE}; color: {T.TEXT}; border: 1.5px solid {T.BORDER};
+                border-radius: 8px; padding: 0 16px; font-size: 13px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {T.BG}; border-color: {T.PRIMARY}; color: {T.PRIMARY}; }}
+            QPushButton:disabled {{ color: {T.TEXT_MUTED}; border-color: {T.DIVIDER}; background: {T.BG}; }}
+        """
+
+        self.btn_prev = QPushButton("‹  Prev")
+        self.btn_prev.setFixedHeight(34)
+        self.btn_prev.setCursor(Qt.PointingHandCursor)
+        self.btn_prev.setStyleSheet(btn_style)
+        self.btn_prev.clicked.connect(self._on_prev)
+        
+        self.btn_next = QPushButton("Next  ›")
+        self.btn_next.setFixedHeight(34)
+        self.btn_next.setCursor(Qt.PointingHandCursor)
+        self.btn_next.setStyleSheet(btn_style)
+        self.btn_next.clicked.connect(self._on_next)
+        
+        lay.addStretch(1)
+        lay.addWidget(self.lbl_info)
+        lay.addSpacing(8)
+        lay.addWidget(self.btn_prev)
+        lay.addWidget(self.btn_next)
+        
+        self._update_ui()
+
+    def set_total_items(self, total_items: int):
+        import math
+        self.total_pages = max(1, math.ceil(total_items / self.items_per_page))
+        if self.current_page > self.total_pages:
+            self.current_page = self.total_pages
+        self._update_ui()
+
+    def _on_prev(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self._update_ui()
+            self.page_changed.emit(self.current_page)
+
+    def _on_next(self):
+        if self.current_page < self.total_pages:
+            self.current_page += 1
+            self._update_ui()
+            self.page_changed.emit(self.current_page)
+
+    def _update_ui(self):
+        self.lbl_info.setText(f"Page {self.current_page} of {self.total_pages}")
+        self.btn_prev.setEnabled(self.current_page > 1)
+        self.btn_next.setEnabled(self.current_page < self.total_pages)

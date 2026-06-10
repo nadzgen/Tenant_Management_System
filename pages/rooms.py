@@ -21,7 +21,7 @@ from database.repositories import get_rooms
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar,
-    MiniInsightCard, KPICard,
+    MiniInsightCard, KPICard, PaginationControl,
 )
 from PySide6.QtWidgets import QGridLayout
 
@@ -182,9 +182,19 @@ class RoomsPage(QWidget):
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         card.body.addWidget(self._tbl)
 
+        # Pagination and row count
+        bottom_row = QHBoxLayout()
         self._count_lbl = QLabel()
         self._count_lbl.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:12px;")
-        card.body.addWidget(self._count_lbl)
+        bottom_row.addWidget(self._count_lbl)
+        bottom_row.addStretch(1)
+        
+        self._pagination = PaginationControl()
+        self._pagination.page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        self._pagination.items_per_page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        bottom_row.addWidget(self._pagination)
+        
+        card.body.addLayout(bottom_row)
 
         root.addWidget(card)
         root.addStretch(1)
@@ -193,8 +203,15 @@ class RoomsPage(QWidget):
 
     def _reload_table(self, rows: list[dict] | None = None):
         data = rows if rows is not None else self._data
+        self._filtered_data = data
+        self._pagination.set_total_items(len(data))
+        
+        start_idx = (self._pagination.current_page - 1) * self._pagination.items_per_page
+        end_idx = start_idx + self._pagination.items_per_page
+        page_data = data[start_idx:end_idx]
+
         self._tbl.setRowCount(0)
-        for r_data in data:
+        for r_data in page_data:
             if "id" not in r_data:
                 r_data["id"] = f"R-{r_data.get('number','??')}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
@@ -204,7 +221,7 @@ class RoomsPage(QWidget):
             set_table_item(self._tbl, r, 3, str(r_data["capacity"]))
             set_table_item(self._tbl, r, 4, f"₱ {int(r_data['rent']):,}")
             set_badge_cell(self._tbl, r, 5, r_data["status"])
-        self._count_lbl.setText(f"{len(data)} room(s) listed")
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} room(s) listed")
 
     def _filter_table(self, query: str):
         q = query.lower()
@@ -212,6 +229,7 @@ class RoomsPage(QWidget):
                     if q in r.get("number","").lower()
                     or q in r.get("type","").lower()
                     or q in r.get("status","").lower()]
+        self._pagination.current_page = 1
         self._reload_table(filtered)
 
     def _selected_index(self) -> int | None:
@@ -233,7 +251,7 @@ class RoomsPage(QWidget):
             rec["id"] = f"R-{rec['number']}"
             self._data.append(rec)
             # TODO(DB): INSERT INTO rooms VALUES (...)
-            self._reload_table()
+            self._filter_table(self._search.text())
 
     def _edit_room(self):
         idx = self._selected_index()
@@ -244,7 +262,7 @@ class RoomsPage(QWidget):
         if dlg.exec() == QDialog.Accepted:
             self._data[idx] = dlg.record
             # TODO(DB): UPDATE rooms SET ... WHERE id=?
-            self._reload_table()
+            self._filter_table(self._search.text())
 
     def _delete_room(self):
         idx = self._selected_index()
@@ -260,4 +278,4 @@ class RoomsPage(QWidget):
         if ans == QMessageBox.Yes:
             self._data.pop(idx)
             # TODO(DB): DELETE FROM rooms WHERE id=?
-            self._reload_table()
+            self._filter_table(self._search.text())

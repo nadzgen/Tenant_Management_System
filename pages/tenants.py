@@ -21,7 +21,7 @@ from theme import T
 from database.repositories import get_tenants
 from widgets.components import (
     Card, section_title, styled_table, set_table_item,
-    primary_button, ghost_button, danger_button, search_bar,
+    primary_button, ghost_button, danger_button, search_bar, PaginationControl,
 )
 
 
@@ -176,10 +176,19 @@ class TenantsPage(QWidget):
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         card.body.addWidget(self._tbl)
 
-        # Row count label
+        # Pagination and row count
+        bottom_row = QHBoxLayout()
         self._count_lbl = QLabel()
         self._count_lbl.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:12px;")
-        card.body.addWidget(self._count_lbl)
+        bottom_row.addWidget(self._count_lbl)
+        bottom_row.addStretch(1)
+        
+        self._pagination = PaginationControl()
+        self._pagination.page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        self._pagination.items_per_page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        bottom_row.addWidget(self._pagination)
+        
+        card.body.addLayout(bottom_row)
 
         root.addWidget(card)
         root.addStretch(1)
@@ -188,21 +197,29 @@ class TenantsPage(QWidget):
 
     def _reload_table(self, rows: list[dict] | None = None):
         data = rows if rows is not None else self._data
+        self._filtered_data = data
+        self._pagination.set_total_items(len(data))
+        
+        start_idx = (self._pagination.current_page - 1) * self._pagination.items_per_page
+        end_idx = start_idx + self._pagination.items_per_page
+        page_data = data[start_idx:end_idx]
+
         self._tbl.setRowCount(0)
-        for i, t in enumerate(data):
+        for i, t in enumerate(page_data):
             # auto-generate ID if missing
             if "id" not in t:
                 t["id"] = f"T-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
             for col, key in enumerate(["id","name","contact","birthdate","sex","start_date","end_date"]):
                 set_table_item(self._tbl, r, col, str(t.get(key, "")))
-        self._count_lbl.setText(f"{len(data)} tenant(s) found")
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenant(s) found")
 
     def _filter_table(self, query: str):
         q = query.lower()
         filtered = [t for t in self._data
                     if q in t["name"].lower()
                     or q in t.get("contact","").lower()]
+        self._pagination.current_page = 1
         self._reload_table(filtered)
 
     def _selected_index(self) -> int | None:
@@ -225,7 +242,7 @@ class TenantsPage(QWidget):
             rec["id"] = f"T-{(len(self._data)+1):03d}"
             self._data.append(rec)
             # TODO(DB): INSERT INTO tenants VALUES (...)
-            self._reload_table()
+            self._filter_table(self._search.text())
 
     def _edit_tenant(self):
         idx = self._selected_index()
@@ -236,7 +253,7 @@ class TenantsPage(QWidget):
         if dlg.exec() == QDialog.Accepted:
             self._data[idx] = dlg.record
             # TODO(DB): UPDATE tenants SET ... WHERE id=?
-            self._reload_table()
+            self._filter_table(self._search.text())
 
     def _delete_tenant(self):
         idx = self._selected_index()
@@ -252,4 +269,4 @@ class TenantsPage(QWidget):
         if ans == QMessageBox.Yes:
             self._data.pop(idx)
             # TODO(DB): DELETE FROM tenants WHERE id=?
-            self._reload_table()
+            self._filter_table(self._search.text())

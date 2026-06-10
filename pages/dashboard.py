@@ -151,7 +151,7 @@ class DashboardPage(QWidget):
         recent = Card(padding=20)
         from widgets.components import styled_table, set_table_item, set_badge_cell
         tbl = styled_table(["Payment ID", "Tenant", "Amount", "Due Date", "Status"])
-        tbl.setMaximumHeight(400)
+        tbl.setFixedHeight(300)
         # Sort payments by most recent date (paid_on) descending, fallback to due date
         sorted_payments = sorted(payments, key=lambda p: p.get("paid_on", p.get("due", "")), reverse=True)
         for row_data in sorted_payments[:10]:

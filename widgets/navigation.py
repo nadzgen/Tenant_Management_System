@@ -66,7 +66,7 @@ class Sidebar(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(252)
+        self.setFixedWidth(235)
         self.setObjectName("Sidebar")
         self.setStyleSheet(
             f"#Sidebar {{ background:{T.SIDEBAR}; border-right:1px solid {T.BORDER}; }}"

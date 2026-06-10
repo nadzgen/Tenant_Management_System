@@ -22,6 +22,7 @@ from database.repositories import get_payments
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar, KPICard,
+    PaginationControl,
 )
 
 
@@ -212,15 +213,25 @@ class PaymentsPage(QWidget):
         card.body.addLayout(filter_row)
 
         self._tbl = styled_table(
-            ["Payment ID", "Month", "Tenant ID", "Tenant Name", "Amount", "Type", "Due Date", "Paid On", "Status"]
+            ["Payment ID", "Tenant ID", "Tenant Name", "Amount", "Type", "Due Date", "Paid On", "Status"]
         )
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         card.body.addWidget(self._tbl)
 
+        # Pagination and row count
+        bottom_row = QHBoxLayout()
         self._count_lbl = QLabel()
         self._count_lbl.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:12px;")
-        card.body.addWidget(self._count_lbl)
+        bottom_row.addWidget(self._count_lbl)
+        bottom_row.addStretch(1)
+        
+        self._pagination = PaginationControl()
+        self._pagination.page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        self._pagination.items_per_page_changed.connect(lambda _: self._reload_table(self._filtered_data))
+        bottom_row.addWidget(self._pagination)
+        
+        card.body.addLayout(bottom_row)
 
         root.addWidget(card)
         root.addStretch(1)
@@ -251,21 +262,27 @@ class PaymentsPage(QWidget):
 
     def _reload_table(self, rows: list[dict] | None = None):
         data = rows if rows is not None else self._data
+        self._filtered_data = data
+        self._pagination.set_total_items(len(data))
+        
+        start_idx = (self._pagination.current_page - 1) * self._pagination.items_per_page
+        end_idx = start_idx + self._pagination.items_per_page
+        page_data = data[start_idx:end_idx]
+
         self._tbl.setRowCount(0)
-        for p in data:
+        for p in page_data:
             if "id" not in p:
                 p["id"] = f"P-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
             set_table_item(self._tbl, r, 0, p["id"])
-            set_table_item(self._tbl, r, 1, p["due"][:7] if p.get("due") else "")
-            set_table_item(self._tbl, r, 2, p.get("tenant_id",""))
-            set_table_item(self._tbl, r, 3, p["tenant"])
-            set_table_item(self._tbl, r, 4, f"₱ {int(p['amount']):,}")
-            set_table_item(self._tbl, r, 5, p.get("type","—"))
-            set_table_item(self._tbl, r, 6, p["due"])
-            set_table_item(self._tbl, r, 7, p.get("paid_on","—"))
-            set_badge_cell(self._tbl, r, 8, p["status"])
-        self._count_lbl.setText(f"{len(data)} payment record(s)")
+            set_table_item(self._tbl, r, 1, p.get("tenant_id",""))
+            set_table_item(self._tbl, r, 2, p["tenant"])
+            set_table_item(self._tbl, r, 3, f"₱ {int(p['amount']):,}")
+            set_table_item(self._tbl, r, 4, p.get("type","—"))
+            set_table_item(self._tbl, r, 5, p["due"])
+            set_table_item(self._tbl, r, 6, (p.get("paid_on") if p.get("paid_on") and p.get("paid_on") != "NULL" else "—"))
+            set_badge_cell(self._tbl, r, 7, p["status"])
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} payment record(s)")
 
     def _apply_filters(self):
         q = self._search.text().lower()
@@ -275,6 +292,7 @@ class PaymentsPage(QWidget):
             if (q in p["tenant"].lower() or q in p["id"].lower())
             and (sf == "All Statuses" or p["status"] == sf)
         ]
+        self._pagination.current_page = 1
         self._reload_table(filtered)
 
     def _filter_table(self, _): self._apply_filters()
@@ -296,7 +314,7 @@ class PaymentsPage(QWidget):
             rec["id"] = f"P-{(len(self._data)+1):03d}"
             self._data.append(rec)
             # TODO(DB): INSERT INTO payments VALUES (...)
-            self._reload_table()
+            self._apply_filters()
 
     def _edit_payment(self):
         idx = self._selected_index()
@@ -307,7 +325,7 @@ class PaymentsPage(QWidget):
         if dlg.exec() == QDialog.Accepted:
             self._data[idx] = dlg.record
             # TODO(DB): UPDATE payments SET ... WHERE id=?
-            self._reload_table()
+            self._apply_filters()
 
     def _delete_payment(self):
         idx = self._selected_index()
@@ -323,4 +341,4 @@ class PaymentsPage(QWidget):
         if ans == QMessageBox.Yes:
             self._data.pop(idx)
             # TODO(DB): DELETE FROM payments WHERE id=?
-            self._reload_table()
+            self._apply_filters()
