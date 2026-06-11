@@ -62,6 +62,10 @@ class OnboardingPage(QWidget):
         
         self._build()
         
+    def refresh(self):
+        self._load_rooms()
+        self._set_step(0)
+
     def _build(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(28, 12, 28, 28)
@@ -92,13 +96,53 @@ class OnboardingPage(QWidget):
         self.f_dob = QDateEdit()
         self.f_dob.setCalendarPopup(True)
         self.f_dob.setFixedHeight(42)
-        self.f_dob.setStyleSheet(f"QDateEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}")
+        self.f_dob.setStyleSheet(f"""
+            QDateEdit {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QDateEdit::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QDateEdit::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         self.f_dob.setDate(QDate(1990, 1, 1))
         
         self.f_sex = QComboBox()
         self.f_sex.addItems(["Male", "Female", "Other"])
         self.f_sex.setFixedHeight(42)
-        self.f_sex.setStyleSheet(f"QComboBox {{ background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }} QComboBox::drop-down {{ border:none; }}")
+        self.f_sex.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         
         lbl_style = f"color:{T.TEXT}; font-size:13px; font-weight:600;"
         
@@ -150,7 +194,27 @@ class OnboardingPage(QWidget):
         self.f_move_in = QDateEdit()
         self.f_move_in.setCalendarPopup(True)
         self.f_move_in.setFixedHeight(42)
-        self.f_move_in.setStyleSheet(f"QDateEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}")
+        self.f_move_in.setStyleSheet(f"""
+            QDateEdit {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QDateEdit::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QDateEdit::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         self.f_move_in.setDate(QDate.currentDate())
         
         lbl_dep = QLabel("Required Deposit (₱)"); lbl_dep.setStyleSheet(lbl_style); lay_pay.addWidget(lbl_dep); lay_pay.addWidget(self.f_deposit)
@@ -287,13 +351,18 @@ class OnboardingPage(QWidget):
         self._set_step(3)
 
     def _finish(self):
-        # TODO(DB): Wrap in transaction
-        # INSERT INTO Tenant ...
-        # INSERT INTO Rental (tenant_id, room_id, start_date) ...
-        # INSERT INTO Payment (Deposit) ...
-        # if pay_rent: INSERT INTO Payment (Rent) ...
+        from database.repositories import onboard_tenant
         
-        QMessageBox.information(self, "Success", f"Tenant '{self.tenant_data['name']}' onboarded successfully!")
+        room_id = int(self.room_data['id'])
+        room_rent = float(self.room_data['rent'])
+        
+        success = onboard_tenant(self.tenant_data, room_id, room_rent, self.payment_data)
+        
+        if success:
+            QMessageBox.information(self, "Success", f"Tenant '{self.tenant_data['name']}' onboarded successfully!")
+        else:
+            QMessageBox.critical(self, "Error", "Failed to onboard tenant. Please check database logs.")
+            return
         
         # Reset form
         self.f_name.clear()

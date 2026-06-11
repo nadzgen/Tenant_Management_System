@@ -25,13 +25,23 @@ from widgets.components import (
 class ReportsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self._build()
+
+    def refresh(self):
+        while self.main_layout.count():
+            child = self.main_layout.takeAt(0)
+            if child.widget(): child.widget().deleteLater()
+        self._build()
+
+    def _build(self):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
-        outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(scroll)
+        self.main_layout.addWidget(scroll)
 
         content = QWidget(); scroll.setWidget(content)
         root = QVBoxLayout(content)
@@ -74,11 +84,27 @@ class ReportsPage(QWidget):
         head.addWidget(th); head.addStretch(1)
         period = QComboBox()
         period.addItems(["This Year", "Last 6 Months", "This Month"])
-        period.setStyleSheet(
-            f"QComboBox {{ background:{T.BG}; border:1px solid {T.BORDER};"
-            f" border-radius:8px; padding:5px 10px; color:{T.TEXT}; font-size:12px; }}"
-            f"QComboBox::drop-down {{ border:none; }}"
-        )
+        period.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG};
+                border: 1px solid {T.BORDER};
+                border-radius: 8px;
+                padding: 5px 10px;
+                color: {T.TEXT};
+                font-size: 12px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 24px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 14px;
+                height: 14px;
+            }}
+        """)
         head.addWidget(period)
         trend.body.addLayout(head)
         trend.body.addWidget(LineChart(revenue_monthly, revenue_labels))

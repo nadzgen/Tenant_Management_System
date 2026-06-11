@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import copy
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
-    QMessageBox, QAbstractItemView,
+    QMessageBox, QAbstractItemView, QGridLayout, QMenu,
 )
 
 from theme import T
@@ -21,9 +22,8 @@ from database.repositories import get_rooms
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar,
-    MiniInsightCard, KPICard, PaginationControl,
+    MiniInsightCard, KPICard, PaginationControl, table_action_cell, filter_button
 )
-from PySide6.QtWidgets import QGridLayout
 
 
 # ---------------------------------------------------------------------------
@@ -65,11 +65,27 @@ class RoomDialog(QDialog):
             idx = cb.findText(val)
             if idx >= 0: cb.setCurrentIndex(idx)
             cb.setFixedHeight(42)
-            cb.setStyleSheet(
-                f"QComboBox {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
-                f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
-                f"QComboBox::drop-down {{ border:none; }}"
-            )
+            cb.setStyleSheet(f"""
+                QComboBox {{
+                    background: {T.BG};
+                    border: 1.5px solid {T.BORDER};
+                    border-radius: 10px;
+                    padding: 0 14px;
+                    color: {T.TEXT};
+                    font-size: 13px;
+                }}
+                QComboBox::drop-down {{
+                    subcontrol-origin: padding;
+                    subcontrol-position: top right;
+                    width: 32px;
+                    border: none;
+                }}
+                QComboBox::down-arrow {{
+                    image: url(assets/chevron-down.svg);
+                    width: 16px;
+                    height: 16px;
+                }}
+            """)
             return cb
 
         lbl = QLabel("Room Number"); lbl.setStyleSheet(lbl_style)
@@ -161,23 +177,55 @@ class RoomsPage(QWidget):
         card = Card(padding=20)
         toolbar = QHBoxLayout(); toolbar.setSpacing(12)
         self._search = search_bar("Search room number, type, or status…")
-        self._search.textChanged.connect(self._filter_table)
+        self._search.textChanged.connect(lambda _: self._apply_filters())
         toolbar.addWidget(self._search, 1)
 
+        self._filter_btn = filter_button("Filter")
+        menu = QMenu(self._filter_btn)
+        menu.setStyleSheet(f"""
+            QMenu {{ background-color: {T.SURFACE}; border: 1px solid {T.BORDER}; border-radius: 8px; padding: 4px; }}
+            QMenu::item {{ padding: 8px 24px 8px 24px; border-radius: 4px; color: {T.TEXT}; }}
+            QMenu::item:selected {{ background-color: {T.BG}; color: {T.PRIMARY}; }}
+            QMenu::indicator {{ width: 0px; height: 0px; }}
+        """)
+        
+        type_menu = menu.addMenu("Room Type")
+        self._type_group = QActionGroup(self)
+        for t in ["All Types", "Solo", "Bedspacer", "Solo Deluxe", "Bedspacer Deluxe"]:
+            act = type_menu.addAction(t)
+            act.setCheckable(True)
+            if t == "All Types": act.setChecked(True)
+            self._type_group.addAction(act)
+            
+        status_menu = menu.addMenu("Status")
+        self._status_group = QActionGroup(self)
+        for s in ["All Statuses", "Full", "Partially Occupied", "Vacant"]:
+            act = status_menu.addAction(s)
+            act.setCheckable(True)
+            if s == "All Statuses": act.setChecked(True)
+            self._status_group.addAction(act)
+            
+        self._type_group.triggered.connect(lambda _: self._apply_filters())
+        self._status_group.triggered.connect(lambda _: self._apply_filters())
+        
+        self._filter_btn.setMenu(menu)
+        toolbar.addWidget(self._filter_btn)
+
         self._add_btn  = primary_button("Add Room", "plus")
-        self._edit_btn = ghost_button("Edit", "edit")
-        self._del_btn  = danger_button("Delete", "trash")
         self._add_btn.clicked.connect(self._add_room)
-        self._edit_btn.clicked.connect(self._edit_room)
-        self._del_btn.clicked.connect(self._delete_room)
         toolbar.addWidget(self._add_btn)
-        toolbar.addWidget(self._edit_btn)
-        toolbar.addWidget(self._del_btn)
         card.body.addLayout(toolbar)
 
         self._tbl = styled_table(
-            ["Room ID", "Room Number", "Type", "Capacity", "Monthly Rent", "Status"]
+            ["Room ID", "Room Number", "Type", "Monthly Rent", "Occupancy", "Occupant Sex", "Status", "Action"]
         )
+        self._tbl.horizontalHeader().sortIndicatorChanged.connect(self._on_sort)
+        self._sort_col = -1
+        self._sort_order = Qt.AscendingOrder
+        
+        from widgets.components import update_table_headers
+        update_table_headers(self._tbl, self._sort_col, self._sort_order)
+        
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         card.body.addWidget(self._tbl)
@@ -218,19 +266,60 @@ class RoomsPage(QWidget):
             set_table_item(self._tbl, r, 0, r_data["id"])
             set_table_item(self._tbl, r, 1, r_data["number"])
             set_table_item(self._tbl, r, 2, r_data["type"])
-            set_table_item(self._tbl, r, 3, str(r_data["capacity"]))
-            set_table_item(self._tbl, r, 4, f"₱ {int(r_data['rent']):,}")
-            set_badge_cell(self._tbl, r, 5, r_data["status"])
+            set_table_item(self._tbl, r, 3, f"₱ {int(r_data['rent']):,}")
+            set_table_item(self._tbl, r, 4, f"{r_data.get('occupied_slots', 0)}/{r_data['capacity']}")
+            set_table_item(self._tbl, r, 5, r_data.get("occupant_sex", "—"))
+            set_badge_cell(self._tbl, r, 6, r_data["status"])
+            
+            rid = str(r_data["id"])
+            action_widget = table_action_cell(
+                on_edit=lambda checked, rid=rid: self._edit_room(rid),
+                on_delete=lambda checked, rid=rid: self._delete_room(rid)
+            )
+            self._tbl.setCellWidget(r, 7, action_widget)
         self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} room(s) listed")
 
-    def _filter_table(self, query: str):
-        q = query.lower()
-        filtered = [r for r in self._data
-                    if q in r.get("number","").lower()
-                    or q in r.get("type","").lower()
-                    or q in r.get("status","").lower()]
-        self._pagination.current_page = 1
+    def _apply_filters(self, reset_page: bool = True):
+        q = self._search.text().lower()
+        tf = self._type_group.checkedAction().text() if self._type_group.checkedAction() else "All Types"
+        sf = self._status_group.checkedAction().text() if self._status_group.checkedAction() else "All Statuses"
+        filtered = [
+            r for r in self._data
+            if (q in r.get("number","").lower() or q in r.get("type","").lower() or q in r.get("status","").lower())
+            and (tf == "All Types" or r.get("type") == tf)
+            and (sf == "All Statuses" or r.get("status") == sf)
+        ]
+        
+        if hasattr(self, "_sort_col") and 0 <= self._sort_col < 7:
+            keys = ["id", "number", "type", "rent", "occupied_slots", "occupant_sex", "status"]
+            k = keys[self._sort_col]
+            rev = (self._sort_order == Qt.DescendingOrder)
+            def sort_key(x):
+                val = x.get(k, "")
+                if k in ("occupied_slots", "rent"):
+                    try: return float(val)
+                    except: return 0.0
+                return str(val).lower()
+            filtered.sort(key=sort_key, reverse=rev)
+
+        if reset_page:
+            self._pagination.current_page = 1
         self._reload_table(filtered)
+
+    def _on_sort(self, col, order):
+        if col == 7: return # Action column
+        
+        if self._sort_col == col:
+            self._sort_order = Qt.DescendingOrder if self._sort_order == Qt.AscendingOrder else Qt.AscendingOrder
+        else:
+            self._sort_col = col
+            self._sort_order = Qt.AscendingOrder
+            
+        from widgets.components import update_table_headers
+        update_table_headers(self._tbl, self._sort_col, self._sort_order)
+        self._apply_filters(reset_page=False)
+
+    def _filter_table(self, _): self._apply_filters()
 
     def _selected_index(self) -> int | None:
         rows = self._tbl.selectionModel().selectedRows()
@@ -238,9 +327,14 @@ class RoomsPage(QWidget):
             return None
         rid = self._tbl.item(rows[0].row(), 0).text()
         for i, r in enumerate(self._data):
-            if r.get("id") == rid:
+            if str(r.get("id")) == rid:
                 return i
         return None
+
+    def refresh(self):
+        from database.repositories import get_rooms
+        self._data = get_rooms()
+        self._apply_filters(reset_page=False)
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -248,24 +342,34 @@ class RoomsPage(QWidget):
         dlg = RoomDialog(parent=self)
         if dlg.exec() == QDialog.Accepted:
             rec = dlg.record
-            rec["id"] = f"R-{rec['number']}"
-            self._data.append(rec)
-            # TODO(DB): INSERT INTO rooms VALUES (...)
-            self._filter_table(self._search.text())
+            from database.repositories import add_room
+            if add_room(rec):
+                self.refresh()
 
-    def _edit_room(self):
-        idx = self._selected_index()
+    def _edit_room(self, rid: str = None):
+        if not isinstance(rid, str):
+            idx = self._selected_index()
+        else:
+            idx = next((i for i, r in enumerate(self._data) if str(r.get("id")) == rid), None)
+            
         if idx is None:
             QMessageBox.information(self, "Select a Room", "Please select a room first.")
             return
         dlg = RoomDialog(record=self._data[idx], parent=self)
         if dlg.exec() == QDialog.Accepted:
-            self._data[idx] = dlg.record
-            # TODO(DB): UPDATE rooms SET ... WHERE id=?
-            self._filter_table(self._search.text())
+            rec = dlg.record
+            edit_rid = self._data[idx].get("id")
+            from database.repositories import update_room
+            if edit_rid is not None:
+                update_room(edit_rid, rec)
+            self.refresh()
 
-    def _delete_room(self):
-        idx = self._selected_index()
+    def _delete_room(self, rid: str = None):
+        if not isinstance(rid, str):
+            idx = self._selected_index()
+        else:
+            idx = next((i for i, r in enumerate(self._data) if str(r.get("id")) == rid), None)
+            
         if idx is None:
             QMessageBox.information(self, "Select a Room", "Please select a room to delete.")
             return
@@ -276,6 +380,8 @@ class RoomsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if ans == QMessageBox.Yes:
-            self._data.pop(idx)
-            # TODO(DB): DELETE FROM rooms WHERE id=?
-            self._filter_table(self._search.text())
+            del_rid = self._data[idx].get("id")
+            from database.repositories import delete_room
+            if del_rid is not None:
+                delete_room(del_rid)
+            self.refresh()

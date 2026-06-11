@@ -9,19 +9,19 @@ TODO(DB): Replace TENANTS list operations with SQLite INSERT / UPDATE / DELETE.
 from __future__ import annotations
 
 import copy
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QDate
+from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
-    QMessageBox, QFrame, QDateEdit, QAbstractItemView,
+    QMessageBox, QFrame, QDateEdit, QAbstractItemView, QMenu,
 )
-from PySide6.QtCore import QDate
 
 from theme import T
 from database.repositories import get_tenants
 from widgets.components import (
     Card, section_title, styled_table, set_table_item,
-    primary_button, ghost_button, danger_button, search_bar, PaginationControl,
+    primary_button, ghost_button, danger_button, search_bar, PaginationControl, table_action_cell, filter_button
 )
 
 
@@ -73,10 +73,27 @@ class TenantDialog(QDialog):
         self.birthdate_f = QDateEdit()
         self.birthdate_f.setCalendarPopup(True)
         self.birthdate_f.setFixedHeight(42)
-        self.birthdate_f.setStyleSheet(
-            f"QDateEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
-            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
-        )
+        self.birthdate_f.setStyleSheet(f"""
+            QDateEdit {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QDateEdit::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QDateEdit::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         date_str = self.record.get("birthdate", "1990-01-01")
         self.birthdate_f.setDate(QDate.fromString(date_str, "yyyy-MM-dd"))
         form.addRow(lbl3, self.birthdate_f)
@@ -87,11 +104,27 @@ class TenantDialog(QDialog):
         idx = self.sex_f.findText(sex_val)
         if idx >= 0: self.sex_f.setCurrentIndex(idx)
         self.sex_f.setFixedHeight(42)
-        self.sex_f.setStyleSheet(
-            f"QComboBox {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
-            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
-            f"QComboBox::drop-down {{ border:none; subcontrol-position:right center; width:24px; }}"
-        )
+        self.sex_f.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         form.addRow(lbl4, self.sex_f)
 
 
@@ -152,26 +185,46 @@ class TenantsPage(QWidget):
         # ── Toolbar ──────────────────────────────────────────────────────────
         toolbar = QHBoxLayout(); toolbar.setSpacing(12)
         self._search = search_bar("Search by name or contact…")
-        self._search.textChanged.connect(self._filter_table)
+        self._search.textChanged.connect(lambda _: self._filter_table(self._search.text()))
         toolbar.addWidget(self._search, 1)
+
+        self._filter_btn = filter_button("Filter")
+        menu = QMenu(self._filter_btn)
+        menu.setStyleSheet(f"""
+            QMenu {{ background-color: {T.SURFACE}; border: 1px solid {T.BORDER}; border-radius: 8px; padding: 4px; }}
+            QMenu::item {{ padding: 8px 24px 8px 24px; border-radius: 4px; color: {T.TEXT}; }}
+            QMenu::item:selected {{ background-color: {T.BG}; color: {T.PRIMARY}; }}
+        """)
+        
+        self._sex_group = QActionGroup(self)
+        for s in ["All Sexes", "Female", "Male"]:
+            act = menu.addAction(s)
+            act.setCheckable(True)
+            if s == "All Sexes": act.setChecked(True)
+            self._sex_group.addAction(act)
+            
+        self._sex_group.triggered.connect(lambda _: self._filter_table(self._search.text()))
+        self._filter_btn.setMenu(menu)
+        toolbar.addWidget(self._filter_btn)
 
         self._add_btn = primary_button("Add Tenant", "plus")
         self._add_btn.clicked.connect(self._add_tenant)
-        self._edit_btn = ghost_button("Edit", "edit")
-        self._edit_btn.clicked.connect(self._edit_tenant)
-        self._del_btn  = danger_button("Delete", "trash")
-        self._del_btn.clicked.connect(self._delete_tenant)
         toolbar.addWidget(self._add_btn)
-        toolbar.addWidget(self._edit_btn)
-        toolbar.addWidget(self._del_btn)
 
         card = Card(padding=20)
         card.body.addLayout(toolbar)
 
         # Table
         self._tbl = styled_table(
-            ["Tenant ID", "Full Name", "Contact", "Birthdate", "Sex", "Start Date", "End Date"]
+            ["Tenant ID", "Full Name", "Contact", "Birthdate", "Sex", "Start Date", "End Date", "Action"]
         )
+        self._tbl.horizontalHeader().sortIndicatorChanged.connect(self._on_sort)
+        self._sort_col = -1
+        self._sort_order = Qt.AscendingOrder
+        
+        from widgets.components import update_table_headers
+        update_table_headers(self._tbl, self._sort_col, self._sort_order)
+        
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
         card.body.addWidget(self._tbl)
@@ -212,15 +265,45 @@ class TenantsPage(QWidget):
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
             for col, key in enumerate(["id","name","contact","birthdate","sex","start_date","end_date"]):
                 set_table_item(self._tbl, r, col, str(t.get(key, "")))
+            
+            tid = str(t["id"])
+            action_widget = table_action_cell(
+                on_edit=lambda checked, tid=tid: self._edit_tenant(tid),
+                on_delete=lambda checked, tid=tid: self._delete_tenant(tid)
+            )
+            self._tbl.setCellWidget(r, 7, action_widget)
         self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenant(s) found")
 
-    def _filter_table(self, query: str):
+    def _filter_table(self, query: str, reset_page: bool = True):
         q = query.lower()
+        sf = self._sex_group.checkedAction().text() if self._sex_group.checkedAction() else "All Sexes"
         filtered = [t for t in self._data
-                    if q in t["name"].lower()
-                    or q in t.get("contact","").lower()]
-        self._pagination.current_page = 1
+                    if (q in t["name"].lower() or q in t.get("contact","").lower())
+                    and (sf == "All Sexes" or t.get("sex") == sf)]
+                    
+        if hasattr(self, "_sort_col") and 0 <= self._sort_col < 7:
+            keys = ["id", "name", "contact", "birthdate", "sex", "start_date", "end_date"]
+            k = keys[self._sort_col]
+            rev = (self._sort_order == Qt.DescendingOrder)
+            filtered.sort(key=lambda x: str(x.get(k, "")).lower(), reverse=rev)
+
+        if reset_page:
+            self._pagination.current_page = 1
         self._reload_table(filtered)
+
+    def _on_sort(self, col, order):
+        if col == 7: return # Action column
+        
+        # Manually toggle order if the same column is clicked since we hide the native indicator
+        if self._sort_col == col:
+            self._sort_order = Qt.DescendingOrder if self._sort_order == Qt.AscendingOrder else Qt.AscendingOrder
+        else:
+            self._sort_col = col
+            self._sort_order = Qt.AscendingOrder
+            
+        from widgets.components import update_table_headers
+        update_table_headers(self._tbl, self._sort_col, self._sort_order)
+        self._filter_table(self._search.text(), reset_page=False)
 
     def _selected_index(self) -> int | None:
         rows = self._tbl.selectionModel().selectedRows()
@@ -229,34 +312,49 @@ class TenantsPage(QWidget):
         row = rows[0].row()
         tid = self._tbl.item(row, 0).text()
         for i, t in enumerate(self._data):
-            if t.get("id") == tid:
+            if str(t.get("id")) == tid:
                 return i
         return None
 
-    # ── CRUD ─────────────────────────────────────────────────────────────────
+    def refresh(self):
+        from database.repositories import get_tenants
+        self._data = get_tenants()
+        self._filter_table(self._search.text(), reset_page=False)
+
+    # ── CRUD ──────────────────────────────────────────────────────────────────
 
     def _add_tenant(self):
         dlg = TenantDialog(parent=self)
         if dlg.exec() == QDialog.Accepted:
             rec = dlg.record
-            rec["id"] = f"T-{(len(self._data)+1):03d}"
-            self._data.append(rec)
-            # TODO(DB): INSERT INTO tenants VALUES (...)
-            self._filter_table(self._search.text())
+            from database.repositories import add_tenant
+            if add_tenant(rec):
+                self.refresh()
 
-    def _edit_tenant(self):
-        idx = self._selected_index()
+    def _edit_tenant(self, tid: str = None):
+        if not isinstance(tid, str):
+            idx = self._selected_index()
+        else:
+            idx = next((i for i, t in enumerate(self._data) if str(t.get("id")) == tid), None)
+            
         if idx is None:
             QMessageBox.information(self, "Select a Tenant", "Please select a tenant row first.")
             return
         dlg = TenantDialog(record=self._data[idx], parent=self)
         if dlg.exec() == QDialog.Accepted:
-            self._data[idx] = dlg.record
-            # TODO(DB): UPDATE tenants SET ... WHERE id=?
-            self._filter_table(self._search.text())
+            rec = dlg.record
+            edit_tid = self._data[idx].get("id")
+            from database.repositories import update_tenant
+            if edit_tid is not None:
+                update_tenant(int(edit_tid), rec)
+            self.refresh()
 
-    def _delete_tenant(self):
-        idx = self._selected_index()
+    def _delete_tenant(self, tid: str = None):
+        if not isinstance(tid, str):
+            idx = self._selected_index()
+        else:
+            idx = next((i for i, t in enumerate(self._data) if str(t.get("id")) == tid), None)
+            
         if idx is None:
             QMessageBox.information(self, "Select a Tenant", "Please select a tenant row to delete.")
             return
@@ -267,6 +365,9 @@ class TenantsPage(QWidget):
             QMessageBox.Yes | QMessageBox.No,
         )
         if ans == QMessageBox.Yes:
+            del_tid = self._data[idx].get("id")
             self._data.pop(idx)
-            # TODO(DB): DELETE FROM tenants WHERE id=?
-            self._filter_table(self._search.text())
+            from database.repositories import delete_tenant
+            if del_tid is not None:
+                delete_tenant(int(del_tid))
+            self.refresh()

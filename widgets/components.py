@@ -312,6 +312,8 @@ def styled_table(columns: list[str]) -> QTableWidget:
     header.setMinimumSectionSize(80)  # ensure columns aren't too narrow
     header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
     header.setHighlightSections(False)
+    header.setSectionsClickable(True)
+    header.setSortIndicatorShown(False)
 
 
 
@@ -330,6 +332,8 @@ def styled_table(columns: list[str]) -> QTableWidget:
             alternate-background-color:{T.BG};
             color:{T.TEXT};
             font-size:13px;
+            outline: none;
+            show-decoration-selected: 1;
         }}
 
         QTableWidget::item {{
@@ -338,7 +342,7 @@ def styled_table(columns: list[str]) -> QTableWidget:
             border-bottom:1px solid {T.BORDER};
         }}
 
-        QTableWidget::item:selected {{
+        QTableWidget::item:selected, QTableWidget::item:selected:!active {{
             background:{T.PRIMARY_SOFT};
             color:{T.PRIMARY};
         }}
@@ -416,8 +420,10 @@ def set_badge_cell(tbl: QTableWidget, row: int, col: int, status: str):
     """Embed a StatusBadge widget inside a table cell."""
 
     badge = StatusBadge(status)
+    badge.setAttribute(Qt.WA_TransparentForMouseEvents)
 
     wrap = QWidget()
+    wrap.setAttribute(Qt.WA_TransparentForMouseEvents)
     wrap.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     lay = QHBoxLayout(wrap)
@@ -452,6 +458,195 @@ def search_bar(placeholder: str = "Search…") -> QLineEdit:
         QLineEdit:focus {{ border:1.5px solid {T.PRIMARY}; }}
     """)
     return le
+
+
+def dropdown_filter(options: list[str]) -> QComboBox:
+    """Create a styled dropdown combo box for table filtering."""
+    cb = QComboBox()
+    cb.addItems(options)
+    cb.setFixedHeight(42)
+    cb.setStyleSheet(f"""
+        QComboBox {{
+            background:{T.SURFACE}; border:1px solid {T.BORDER};
+            border-radius:10px; padding:0 14px;
+            color:{T.TEXT}; font-size:13px; font-weight:500;
+        }}
+        QComboBox::drop-down {{ border:none; padding-right:10px; }}
+        QComboBox:hover {{ border-color:{T.PRIMARY_SOFT}; }}
+    """)
+    cb.setCursor(Qt.PointingHandCursor)
+    return cb
+
+def filter_button(title="Filter") -> QPushButton:
+    """Create a modern filter button intended to spawn a QMenu."""
+    btn = QPushButton(f"  {title}")
+    btn.setIcon(make_icon("filter", T.TEXT_MUTED, 16))
+    btn.setFixedHeight(42)
+    btn.setCursor(Qt.PointingHandCursor)
+    btn.setStyleSheet(f"""
+        QPushButton {{
+            background: {T.SURFACE};
+            border: 1px solid {T.BORDER};
+            border-radius: 10px;
+            padding: 0 16px;
+            color: {T.TEXT_MUTED};
+            font-size: 13px;
+            font-weight: 500;
+        }}
+        QPushButton:hover {{
+            border-color: {T.PRIMARY_SOFT};
+            color: {T.TEXT};
+        }}
+        QPushButton::menu-indicator {{
+            image: none;
+        }}
+    """)
+    return btn
+
+
+class MonthPicker(QWidget):
+    """Modern SaaS-style month picker with a subtle, clean design."""
+    month_changed = Signal(str)  # emits "YYYY-MM"
+
+    MONTH_NAMES = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    def __init__(self, initial_month: str = "", parent=None):
+        super().__init__(parent)
+        if not initial_month:
+            from datetime import date
+            initial_month = date.today().strftime("%Y-%m")
+        parts = initial_month.split("-")
+        self._year = int(parts[0])
+        self._month = int(parts[1])
+        self._build()
+
+    def _build(self):
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        wrap = QFrame()
+        wrap.setFixedHeight(40)
+        wrap.setStyleSheet(f"""
+            QFrame {{
+                background: {T.SURFACE};
+                border: 1px solid {T.BORDER};
+                border-radius: 8px;
+            }}
+        """)
+        inner = QHBoxLayout(wrap)
+        inner.setContentsMargins(4, 0, 4, 0)
+        inner.setSpacing(0)
+
+        btn_style = f"""
+            QPushButton {{
+                background: transparent;
+                border: none;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background: {T.BG};
+            }}
+        """
+
+        # ── Left arrows ──
+        self._prev_year = QPushButton()
+        self._prev_year.setIcon(make_icon("chevrons-left", T.TEXT_MUTED, 16))
+        self._prev_year.setFixedSize(20, 26)
+        self._prev_year.setCursor(Qt.PointingHandCursor)
+        self._prev_year.setToolTip("Previous year")
+        self._prev_year.setStyleSheet(btn_style)
+        self._prev_year.clicked.connect(self._go_prev_year)
+
+        self._prev = QPushButton()
+        self._prev.setIcon(make_icon("chevron-left", T.TEXT_MUTED, 16))
+        self._prev.setFixedSize(20, 26)
+        self._prev.setCursor(Qt.PointingHandCursor)
+        self._prev.setToolTip("Previous month")
+        self._prev.setStyleSheet(btn_style)
+        self._prev.clicked.connect(self._go_prev)
+
+        # ── Center Area (Icon + Text) ──
+        center_lay = QHBoxLayout()
+        center_lay.setContentsMargins(8, 0, 8, 0)
+        center_lay.setSpacing(6)
+        
+        cal_icon = QLabel()
+        cal_icon.setPixmap(make_icon("calendar", T.TEXT_MUTED, 14).pixmap(14, 14))
+        cal_icon.setFixedSize(14, 14)
+        cal_icon.setAlignment(Qt.AlignCenter)
+        center_lay.addWidget(cal_icon)
+
+        self._month_lbl = QLabel()
+        self._month_lbl.setStyleSheet(f"""
+            color: {T.TEXT_MUTED};
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            background: transparent;
+        """)
+        center_lay.addWidget(self._month_lbl)
+        
+        # ── Right arrow ──
+        self._next = QPushButton()
+        self._next.setIcon(make_icon("chevron-right", T.TEXT_MUTED, 16))
+        self._next.setFixedSize(20, 26)
+        self._next.setCursor(Qt.PointingHandCursor)
+        self._next.setToolTip("Next month")
+        self._next.setStyleSheet(btn_style)
+        self._next.clicked.connect(self._go_next)
+
+        self._next_year = QPushButton()
+        self._next_year.setIcon(make_icon("chevrons-right", T.TEXT_MUTED, 16))
+        self._next_year.setFixedSize(20, 26)
+        self._next_year.setCursor(Qt.PointingHandCursor)
+        self._next_year.setToolTip("Next year")
+        self._next_year.setStyleSheet(btn_style)
+        self._next_year.clicked.connect(self._go_next_year)
+
+        inner.addWidget(self._prev_year)
+        inner.addWidget(self._prev)
+        inner.addLayout(center_lay)
+        inner.addWidget(self._next)
+        inner.addWidget(self._next_year)
+
+        lay.addWidget(wrap)
+        self._update_label()
+
+    def _update_label(self):
+        self._month_lbl.setText(f"{self.MONTH_NAMES[self._month - 1]} {self._year}")
+
+    def _go_prev(self):
+        self._month -= 1
+        if self._month < 1:
+            self._month = 12
+            self._year -= 1
+        self._update_label()
+        self.month_changed.emit(self.value())
+
+    def _go_next(self):
+        self._month += 1
+        if self._month > 12:
+            self._month = 1
+            self._year += 1
+        self._update_label()
+        self.month_changed.emit(self.value())
+
+    def _go_prev_year(self):
+        self._year -= 1
+        self._update_label()
+        self.month_changed.emit(self.value())
+
+    def _go_next_year(self):
+        self._year += 1
+        self._update_label()
+        self.month_changed.emit(self.value())
+
+    def value(self) -> str:
+        return f"{self._year:04d}-{self._month:02d}"
 
 
 # ---------------------------------------------------------------------------
@@ -605,3 +800,50 @@ class PaginationControl(QWidget):
         self.lbl_info.setText(f"Page {self.current_page} of {self.total_pages}")
         self.btn_prev.setEnabled(self.current_page > 1)
         self.btn_next.setEnabled(self.current_page < self.total_pages)
+
+def table_action_cell(on_edit, on_delete) -> QWidget:
+    """Create a cell containing modern Edit and Delete icon buttons."""
+    wrap = QWidget()
+    lay = QHBoxLayout(wrap)
+    lay.setContentsMargins(16, 0, 16, 0)
+    lay.setSpacing(8)
+    lay.setAlignment(Qt.AlignCenter)
+    
+    # Edit button
+    edit_btn = QPushButton()
+    edit_btn.setIcon(make_icon("edit", T.TEXT, 16))
+    edit_btn.setFixedSize(30, 30)
+    edit_btn.setCursor(Qt.PointingHandCursor)
+    edit_btn.setToolTip("Edit")
+    edit_btn.setStyleSheet(f"""
+        QPushButton {{ background:transparent; border-radius:15px; border:none; }}
+        QPushButton:hover {{ background:{T.PRIMARY_SOFT}; }}
+    """)
+    if on_edit: edit_btn.clicked.connect(on_edit)
+    
+    # Delete button
+    del_btn = QPushButton()
+    del_btn.setIcon(make_icon("trash", T.DANGER, 16))
+    del_btn.setFixedSize(30, 30)
+    del_btn.setCursor(Qt.PointingHandCursor)
+    del_btn.setToolTip("Delete")
+    del_btn.setStyleSheet(f"""
+        QPushButton {{ background:transparent; border-radius:15px; border:none; }}
+        QPushButton:hover {{ background:{T.DANGER_SOFT}; }}
+    """)
+    if on_delete: del_btn.clicked.connect(on_delete)
+    
+    lay.addWidget(edit_btn)
+    lay.addWidget(del_btn)
+    
+    return wrap
+
+def update_table_headers(tbl: QTableWidget, sort_col: int, sort_order: Qt.SortOrder):
+    for i in range(tbl.columnCount()):
+        item = tbl.horizontalHeaderItem(i)
+        if not item or item.text() == "Action": continue
+        if i == sort_col:
+            icon_name = "sort-up" if sort_order == Qt.AscendingOrder else "sort-down"
+            item.setIcon(make_icon(icon_name, "transparent", 18))
+        else:
+            item.setIcon(make_icon("sort-neutral", "transparent", 18))

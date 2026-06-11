@@ -87,6 +87,10 @@ class AppShell(QWidget):
 
     def _navigate(self, index: int):
         self.stack.setCurrentIndex(index)
+        page = self._pages[index]
+        if hasattr(page, "refresh"):
+            page.refresh()
+            
         if 0 <= index < len(NAV_ITEMS):
             _, label, _ = NAV_ITEMS[index]
             self.header.set_context(label)
@@ -158,6 +162,53 @@ def main():
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))           
     app.setStyle("Fusion")                        # cross-platform consistency
+    
+    # Global stylesheet for Date Picker Calendars
+    app.setStyleSheet(f"""
+        QCalendarWidget QWidget {{
+            alternate-background-color: {T.BG};
+            background-color: {T.SURFACE};
+        }}
+        QCalendarWidget QToolButton {{
+            color: {T.TEXT};
+            font-size: 13px;
+            font-weight: 600;
+            background-color: transparent;
+            border: none;
+            border-radius: 6px;
+            margin: 4px;
+        }}
+        QCalendarWidget QToolButton:hover {{
+            background-color: {T.BORDER};
+        }}
+        QCalendarWidget QMenu {{
+            background-color: {T.SURFACE};
+            color: {T.TEXT};
+            border: 1px solid {T.BORDER};
+        }}
+        QCalendarWidget QSpinBox {{
+            background-color: {T.BG};
+            color: {T.TEXT};
+            border: 1px solid {T.BORDER};
+            selection-background-color: {T.PRIMARY};
+        }}
+        QCalendarWidget QAbstractItemView:enabled {{
+            color: {T.TEXT};
+            background-color: {T.SURFACE};
+            selection-background-color: {T.PRIMARY};
+            selection-color: white;
+            border: none;
+            outline: none;
+        }}
+        QCalendarWidget QAbstractItemView:disabled {{
+            color: {T.TEXT_MUTED};
+        }}
+        #qt_calendar_navigationbar {{
+            background-color: {T.SURFACE};
+            border-bottom: 1px solid {T.BORDER};
+        }}
+    """)
+    
     win = MainWindow()
     win.show()
     sys.exit(app.exec())

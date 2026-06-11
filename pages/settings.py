@@ -149,11 +149,27 @@ class SettingsPage(QWidget):
         body3.addWidget(_lbl("Theme"))
         theme_cb = QComboBox(); theme_cb.addItems(["Light (Default)", "Dark (Coming Soon)"])
         theme_cb.setFixedHeight(44)
-        theme_cb.setStyleSheet(
-            f"QComboBox {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
-            f" border-radius:11px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
-            f"QComboBox::drop-down {{ border:none; }}"
-        )
+        theme_cb.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 11px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         body3.addWidget(theme_cb)
 
 
