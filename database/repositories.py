@@ -5,7 +5,7 @@ from .db import get_connection
 def get_tenants() -> List[Dict[str, Any]]:
     """
     Fetches all tenants and joins their most recent active rental to retrieve
-    the start_date and end_date.
+    the room number, start_date, and end_date.
     """
     query = """
         SELECT 
@@ -14,13 +14,18 @@ def get_tenants() -> List[Dict[str, Any]]:
             t.contact_number as contact,
             t.birthdate,
             t.sex,
+            COALESCE(r.room_number, '—') as room,
             COALESCE(r.start_date, '') as start_date,
             COALESCE(r.end_date, '') as end_date
         FROM Tenant t
         LEFT JOIN (
-            SELECT tenant_id, start_date, end_date,
-                   ROW_NUMBER() OVER(PARTITION BY tenant_id ORDER BY end_date DESC) as rn
-            FROM Rental
+            SELECT rnt.tenant_id, rnt.start_date, rnt.end_date, rm.room_number,
+                   ROW_NUMBER() OVER(
+                       PARTITION BY rnt.tenant_id 
+                       ORDER BY COALESCE(rnt.end_date, '9999-12-31') DESC, rnt.start_date DESC
+                   ) as rn
+            FROM Rental rnt
+            JOIN Room rm ON rnt.room_id = rm.RoomID
         ) r ON t.TenantID = r.tenant_id AND r.rn = 1
     """
     try:

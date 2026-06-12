@@ -10,7 +10,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QLineEdit, QPushButton, QComboBox, QFrame, QCheckBox, QSizePolicy,
+    QLineEdit, QPushButton, QComboBox, QListView, QFrame, QCheckBox, QSizePolicy,
 )
 
 from theme import T
@@ -147,7 +147,7 @@ class SettingsPage(QWidget):
         # ── Appearance ─────────────────────────────────────────────────────────
         card3, body3 = _section_card("Appearance", "paint", T.WARNING, T.WARNING_SOFT)
         body3.addWidget(_lbl("Theme"))
-        theme_cb = QComboBox(); theme_cb.addItems(["Light (Default)", "Dark (Coming Soon)"])
+        theme_cb = QComboBox(); theme_cb.setView(QListView()); theme_cb.addItems(["Light (Default)", "Dark (Coming Soon)"])
         theme_cb.setFixedHeight(44)
         theme_cb.setStyleSheet(f"""
             QComboBox {{

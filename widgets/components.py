@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
     QGraphicsDropShadowEffect, QSizePolicy, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea,
-    QComboBox, QToolButton,
+    QComboBox, QListView, QToolButton, QMenu,
 )
 
 from icons import make_icon
@@ -314,6 +314,12 @@ def styled_table(columns: list[str]) -> QTableWidget:
     header.setHighlightSections(False)
     header.setSectionsClickable(True)
     header.setSortIndicatorShown(False)
+    
+    for i, col_name in enumerate(columns):
+        if col_name == "Action":
+            item = tbl.horizontalHeaderItem(i)
+            if item:
+                item.setTextAlignment(Qt.AlignCenter)
 
 
 
@@ -462,7 +468,7 @@ def search_bar(placeholder: str = "Search…") -> QLineEdit:
 
 def dropdown_filter(options: list[str]) -> QComboBox:
     """Create a styled dropdown combo box for table filtering."""
-    cb = QComboBox()
+    cb = QComboBox(); cb.setView(QListView())
     cb.addItems(options)
     cb.setFixedHeight(42)
     cb.setStyleSheet(f"""
@@ -811,7 +817,7 @@ def table_action_cell(on_edit, on_delete) -> QWidget:
     
     # Edit button
     edit_btn = QPushButton()
-    edit_btn.setIcon(make_icon("edit", T.TEXT, 16))
+    edit_btn.setIcon(make_icon("edit", T.TEXT_MUTED, 16))
     edit_btn.setFixedSize(30, 30)
     edit_btn.setCursor(Qt.PointingHandCursor)
     edit_btn.setToolTip("Edit")
@@ -823,7 +829,7 @@ def table_action_cell(on_edit, on_delete) -> QWidget:
     
     # Delete button
     del_btn = QPushButton()
-    del_btn.setIcon(make_icon("trash", T.DANGER, 16))
+    del_btn.setIcon(make_icon("trash", "#F87171", 16))
     del_btn.setFixedSize(30, 30)
     del_btn.setCursor(Qt.PointingHandCursor)
     del_btn.setToolTip("Delete")
@@ -847,3 +853,128 @@ def update_table_headers(tbl: QTableWidget, sort_col: int, sort_order: Qt.SortOr
             item.setIcon(make_icon(icon_name, "transparent", 18))
         else:
             item.setIcon(make_icon("sort-neutral", "transparent", 18))
+
+
+# ---------------------------------------------------------------------------
+# Clean ComboBox
+# ---------------------------------------------------------------------------
+
+class CleanComboBox(QPushButton):
+    """
+    A beautifully clean QComboBox replacement that uses a QMenu for its drop-down,
+    allowing perfect rounded corners and drop shadows without the native QComboBox 
+    container artifacts.
+    """
+    currentTextChanged = Signal(str)
+    currentIndexChanged = Signal(int)
+
+    def __init__(self, items=None, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(42)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.BG};
+                border: 1px solid {T.BORDER};
+                border-radius: 8px;
+                padding: 0 28px 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                border-color: {T.PRIMARY_SOFT};
+            }}
+            QPushButton::menu-indicator {{
+                image: url(assets/chevron-down.svg);
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
+                padding-right: 14px;
+                width: 14px;
+                height: 14px;
+            }}
+        """)
+        
+        self._menu = QMenu(self)
+        self._menu.setWindowFlags(self._menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        self._menu.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # Add a shadow to the menu
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 4)
+        self._menu.setGraphicsEffect(shadow)
+        
+        self._menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {T.SURFACE};
+                border: 1px solid {T.BORDER};
+                border-radius: 8px;
+                padding: 4px;
+                margin: 6px; /* Space for the shadow */
+            }}
+            QMenu::item {{
+                padding: 8px 16px;
+                border-radius: 4px;
+                color: {T.TEXT};
+                margin: 2px;
+            }}
+            QMenu::item:selected {{
+                background-color: {T.PRIMARY_SOFT};
+                color: {T.PRIMARY};
+                font-weight: 600;
+            }}
+            QMenu::indicator {{
+                width: 0px;
+                height: 0px;
+            }}
+        """)
+        self.setMenu(self._menu)
+        
+        self._items = []
+        self._current_index = -1
+        
+        if items:
+            self.addItems(items)
+            
+    def addItems(self, items: List[str]):
+        for item in items:
+            self.addItem(item)
+            
+    def addItem(self, item: str):
+        self._items.append(item)
+        act = self._menu.addAction(item)
+        idx = len(self._items) - 1
+        act.triggered.connect(lambda checked=False, i=idx: self.setCurrentIndex(i))
+        if self._current_index == -1:
+            self.setCurrentIndex(0)
+            
+    def currentText(self) -> str:
+        if 0 <= self._current_index < len(self._items):
+            return self._items[self._current_index]
+        return ""
+        
+    def setCurrentIndex(self, idx: int):
+        if 0 <= idx < len(self._items):
+            self._current_index = idx
+            self.setText(self._items[idx])
+            self.currentIndexChanged.emit(idx)
+            self.currentTextChanged.emit(self._items[idx])
+            
+    def setCurrentText(self, text: str):
+        idx = self.findText(text)
+        if idx >= 0:
+            self.setCurrentIndex(idx)
+            
+    def findText(self, text: str) -> int:
+        try:
+            return self._items.index(text)
+        except ValueError:
+            return -1
+
+    def clear(self):
+        self._items.clear()
+        self._menu.clear()
+        self._current_index = -1
+        self.setText("")

@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
     QLineEdit, QComboBox, QDateEdit, QAbstractItemView, QMessageBox,
-    QCheckBox
+    QCheckBox, QListView
 )
 
 from theme import T
@@ -120,8 +120,10 @@ class OnboardingPage(QWidget):
         self.f_dob.setDate(QDate(1990, 1, 1))
         
         self.f_sex = QComboBox()
-        self.f_sex.addItems(["Male", "Female", "Other"])
+        self.f_sex.addItems(["Female", "Male"])
+        self.f_sex.setView(QListView())
         self.f_sex.setFixedHeight(42)
+        self.f_sex.setFixedWidth(160)
         self.f_sex.setStyleSheet(f"""
             QComboBox {{
                 background: {T.BG};
@@ -142,6 +144,7 @@ class OnboardingPage(QWidget):
                 width: 16px;
                 height: 16px;
             }}
+
         """)
         
         lbl_style = f"color:{T.TEXT}; font-size:13px; font-weight:600;"

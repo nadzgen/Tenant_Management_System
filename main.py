@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPalette, QColor
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QStackedWidget, QMessageBox,
@@ -163,49 +163,140 @@ def main():
     app.setFont(QFont("Segoe UI", 10))           
     app.setStyle("Fusion")                        # cross-platform consistency
     
+    # Force a global light palette so native containers (like QComboBox popups) don't bleed Windows dark mode
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor(T.BG))
+    palette.setColor(QPalette.WindowText, QColor(T.TEXT))
+    palette.setColor(QPalette.Base, QColor(T.SURFACE))
+    palette.setColor(QPalette.AlternateBase, QColor(T.BG))
+    palette.setColor(QPalette.ToolTipBase, QColor(T.SURFACE))
+    palette.setColor(QPalette.ToolTipText, QColor(T.TEXT))
+    palette.setColor(QPalette.Text, QColor(T.TEXT))
+    palette.setColor(QPalette.Button, QColor(T.BG))
+    palette.setColor(QPalette.ButtonText, QColor(T.TEXT))
+    palette.setColor(QPalette.BrightText, QColor(T.WARNING))
+    palette.setColor(QPalette.Highlight, QColor(T.PRIMARY))
+    palette.setColor(QPalette.HighlightedText, QColor(Qt.white))
+    app.setPalette(palette)
+    
     # Global stylesheet for Date Picker Calendars
     app.setStyleSheet(f"""
+        QCalendarWidget {{
+            background-color: {T.SURFACE};
+            border: 5px solid {T.BORDER};
+            border-radius: {T.RADIUS_SM}px;
+            /* Padding ensures the sharp corners of the inner grid do not clip the rounded border */
+            padding: 6px; 
+            font-size: 11px;
+        }}
         QCalendarWidget QWidget {{
             alternate-background-color: {T.BG};
-            background-color: {T.SURFACE};
+            background-color: transparent;
+            font-size: 11px;
         }}
         QCalendarWidget QToolButton {{
-            color: {T.TEXT};
-            font-size: 13px;
-            font-weight: 600;
+            color: {T.TEXT_MUTED};
+            font-size: 11px;
+            font-weight: 500;
             background-color: transparent;
             border: none;
             border-radius: 6px;
-            margin: 4px;
+            padding:  0px 4px;
+        }}
+        QCalendarWidget QToolButton#qt_calendar_monthbutton,
+        QCalendarWidget QToolButton#qt_calendar_yearbutton {{
+            margin: 0px;
+            padding: 0px;
+        }}
+        QCalendarWidget QToolButton::menu-indicator {{
+            subcontrol-position: right center;
+            subcontrol-origin: padding;
+            width: 10px;
+            image: none;
+        }}
+        QCalendarWidget QToolButton#qt_calendar_prevmonth {{
+            qproperty-icon: url(none);
+            qproperty-text: "‹";
+            qproperty-toolButtonStyle: 1;
+            font-size: 17px;
+            font-weight: 500;
+            color: {T.TEXT_MUTED};
+            padding: 0px 2px;
+        }}
+        QCalendarWidget QToolButton#qt_calendar_nextmonth {{
+            qproperty-icon: url(none);
+            qproperty-text: "›";
+            qproperty-toolButtonStyle: 1;
+            font-size: 17px;
+            font-weight: 500;
+            color: {T.TEXT_MUTED};
+            padding: 0px 2px;
         }}
         QCalendarWidget QToolButton:hover {{
-            background-color: {T.BORDER};
+            background-color: {T.BG};
+            color: {T.TEXT};
         }}
         QCalendarWidget QMenu {{
             background-color: {T.SURFACE};
             color: {T.TEXT};
             border: 1px solid {T.BORDER};
+            border-radius: 6px;
         }}
         QCalendarWidget QSpinBox {{
             background-color: {T.BG};
             color: {T.TEXT};
             border: 1px solid {T.BORDER};
+            border-radius: 4px;
             selection-background-color: {T.PRIMARY};
         }}
         QCalendarWidget QAbstractItemView:enabled {{
-            color: {T.TEXT};
-            background-color: {T.SURFACE};
+            color: {T.TEXT_MUTED};
+            background-color: transparent;
             selection-background-color: {T.PRIMARY};
             selection-color: white;
             border: none;
             outline: none;
+            border-radius: {T.RADIUS_SM}px;
+            padding: 8px;
+        }}
+        QCalendarWidget QTableView {{
+            margin-left: 4px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            margin-top: 0px;
         }}
         QCalendarWidget QAbstractItemView:disabled {{
-            color: {T.TEXT_MUTED};
+            color: {T.TEXT_SUBTLE};
         }}
         #qt_calendar_navigationbar {{
-            background-color: {T.SURFACE};
-            border-bottom: 1px solid {T.BORDER};
+            background-color: transparent;
+            border-bottom: none;
+            padding: 4px 4px 0px 4px;
+            min-height: 28px;
+        }}
+        
+        /* Global QComboBox Dropdown Styles */
+        QComboBox QAbstractItemView {{
+            background: {T.SURFACE};
+            border: none;
+            padding: 0px;
+            outline: none;
+        }}
+        QComboBox QAbstractItemView::item {{
+            height: 32px;
+            padding-left: 8px;
+            padding-right: 8px;
+            border-radius: 4px;
+            color: {T.TEXT};
+            margin: 2px 4px;
+        }}
+        QComboBox QAbstractItemView::item:hover {{
+            background: {T.BG};
+        }}
+        QComboBox QAbstractItemView::item:selected {{
+            background: {T.PRIMARY_SOFT};
+            color: {T.PRIMARY};
+            font-weight: 600;
         }}
     """)
     

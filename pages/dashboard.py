@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QScrollArea,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QListView, QScrollArea,
     QGridLayout, QFrame, QSizePolicy,
 )
 
@@ -96,25 +96,26 @@ class DashboardPage(QWidget):
         th = QLabel("Revenue Trend")
         th.setStyleSheet(f"color:{T.TEXT}; font-size:15px; font-weight:700;")
         trend_head.addWidget(th); trend_head.addStretch(1)
-        period = QComboBox()
-        period.addItems(["This Year", "Last 6 Months", "This Month"])
+        from widgets.components import CleanComboBox
+        period = CleanComboBox(["This Year", "Last 6 Months", "This Month"])
         period.setStyleSheet(f"""
-            QComboBox {{
+            QPushButton {{
                 background: {T.BG};
                 border: 1px solid {T.BORDER};
                 border-radius: 8px;
-                padding: 5px 10px;
+                padding: 5px 24px 5px 10px;
                 color: {T.TEXT};
                 font-size: 12px;
+                text-align: center;
             }}
-            QComboBox::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 24px;
-                border: none;
+            QPushButton:hover {{
+                border-color: {T.PRIMARY_SOFT};
             }}
-            QComboBox::down-arrow {{
+            QPushButton::menu-indicator {{
                 image: url(assets/chevron-down.svg);
+                subcontrol-origin: padding;
+                subcontrol-position: right center;
+                padding-right: 8px;
                 width: 14px;
                 height: 14px;
             }}

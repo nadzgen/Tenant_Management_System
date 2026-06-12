@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QListView, QDialogButtonBox,
     QMessageBox, QAbstractItemView, QGridLayout, QMenu,
 )
 
@@ -61,7 +61,7 @@ class RoomDialog(QDialog):
             return le
 
         def combo(options, val=""):
-            cb = QComboBox(); cb.addItems(options)
+            cb = QComboBox(); cb.setView(QListView()); cb.addItems(options)
             idx = cb.findText(val)
             if idx >= 0: cb.setCurrentIndex(idx)
             cb.setFixedHeight(42)
@@ -93,7 +93,7 @@ class RoomDialog(QDialog):
         form.addRow(lbl, self.num_f)
 
         lbl2 = QLabel("Room Type"); lbl2.setStyleSheet(lbl_style)
-        self.type_f = combo(["Single","Double","Suite","Studio"], self.record.get("type","Single"))
+        self.type_f = combo(["Solo","Bedspacer","Solo Deluxe","Bedspacer Deluxe"], self.record.get("type","Solo"))
         form.addRow(lbl2, self.type_f)
 
         lbl3 = QLabel("Capacity"); lbl3.setStyleSheet(lbl_style)

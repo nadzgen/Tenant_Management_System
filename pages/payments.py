@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QListView, QDialogButtonBox,
     QMessageBox, QAbstractItemView, QDateEdit, QFrame, QMenu, QCompleter
 )
 
@@ -110,7 +110,7 @@ class PaymentDialog(QDialog):
             return de
 
         lbl_tenant = QLabel("Select Tenant"); lbl_tenant.setStyleSheet(lbl_style)
-        self.tenant_f = QComboBox()
+        self.tenant_f = QComboBox(); self.tenant_f.setView(QListView())
         self.tenant_f.setFixedHeight(42)
         self.tenant_f.setEditable(True)
         self.tenant_f.completer().setCompletionMode(QCompleter.PopupCompletion)
@@ -152,8 +152,37 @@ class PaymentDialog(QDialog):
         self.paid_f = date_edit(self.record.get("paid_on",""))
         form.addRow(lbl5, self.paid_f)
 
+        lbl_type = QLabel("Payment Type"); lbl_type.setStyleSheet(lbl_style)
+        self.type_f = QComboBox(); self.type_f.setView(QListView())
+        self.type_f.addItems(["Regular", "Deposit", "Summer"])
+        idx_type = self.type_f.findText(self.record.get("type","Regular"))
+        if idx_type >= 0: self.type_f.setCurrentIndex(idx_type)
+        self.type_f.setFixedHeight(42)
+        self.type_f.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG};
+                border: 1px solid {T.BORDER};
+                border-radius: 10px;
+                padding: 0 14px;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """)
+        form.addRow(lbl_type, self.type_f)
+
         lbl6 = QLabel("Status"); lbl6.setStyleSheet(lbl_style)
-        self.status_f = QComboBox()
+        self.status_f = QComboBox(); self.status_f.setView(QListView())
         self.status_f.addItems(["Paid","Unpaid","Overdue"])
         idx = self.status_f.findText(self.record.get("status","Unpaid"))
         if idx >= 0: self.status_f.setCurrentIndex(idx)
@@ -222,6 +251,7 @@ class PaymentDialog(QDialog):
         self.record["amount"]        = self.amount_f.text().strip()
         self.record["due"]           = self.due_f.date().toString("yyyy-MM-dd")
         self.record["paid_on"]       = self.paid_f.date().toString("yyyy-MM-dd")
+        self.record["type"]          = self.type_f.currentText()
         self.record["status"]        = self.status_f.currentText()
         if not self.record["tenant_id"]:
             QMessageBox.warning(self, "Validation", "Please select a tenant.")

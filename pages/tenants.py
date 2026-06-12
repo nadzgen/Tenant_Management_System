@@ -14,7 +14,8 @@ from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
-    QMessageBox, QFrame, QDateEdit, QAbstractItemView, QMenu,
+    QMessageBox, QFrame, QDateEdit, QAbstractItemView, QMenu, QListView,
+    QHeaderView
 )
 
 from theme import T
@@ -94,13 +95,14 @@ class TenantDialog(QDialog):
                 height: 16px;
             }}
         """)
-        date_str = self.record.get("birthdate", "1990-01-01")
+        date_str = self.record.get("birthdate", "2000-01-01")
         self.birthdate_f.setDate(QDate.fromString(date_str, "yyyy-MM-dd"))
         form.addRow(lbl3, self.birthdate_f)
 
         lbl4 = QLabel("Sex"); lbl4.setStyleSheet(label_style)
-        self.sex_f = QComboBox(); self.sex_f.addItems(["Male", "Female", "Other"])
-        sex_val = self.record.get("sex", "Male")
+        self.sex_f = QComboBox(); self.sex_f.setView(QListView()); self.sex_f.addItems(["Male", "Female",])
+        self.sex_f.setView(QListView())
+        sex_val = self.record.get("sex", "Female")
         idx = self.sex_f.findText(sex_val)
         if idx >= 0: self.sex_f.setCurrentIndex(idx)
         self.sex_f.setFixedHeight(42)
@@ -124,6 +126,7 @@ class TenantDialog(QDialog):
                 width: 16px;
                 height: 16px;
             }}
+
         """)
         form.addRow(lbl4, self.sex_f)
 
@@ -216,8 +219,9 @@ class TenantsPage(QWidget):
 
         # Table
         self._tbl = styled_table(
-            ["Tenant ID", "Full Name", "Contact", "Birthdate", "Sex", "Start Date", "End Date", "Action"]
+            ["Tenant ID", "Full Name", "Contact", "Birthdate", "Sex", "Room", "Start Date", "End Date", "Action"]
         )
+        self._tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self._tbl.horizontalHeader().sortIndicatorChanged.connect(self._on_sort)
         self._sort_col = -1
         self._sort_order = Qt.AscendingOrder
@@ -263,7 +267,7 @@ class TenantsPage(QWidget):
             if "id" not in t:
                 t["id"] = f"T-{len(self._data):03d}"
             r = self._tbl.rowCount(); self._tbl.insertRow(r)
-            for col, key in enumerate(["id","name","contact","birthdate","sex","start_date","end_date"]):
+            for col, key in enumerate(["id","name","contact","birthdate","sex","room","start_date","end_date"]):
                 set_table_item(self._tbl, r, col, str(t.get(key, "")))
             
             tid = str(t["id"])
@@ -271,7 +275,7 @@ class TenantsPage(QWidget):
                 on_edit=lambda checked, tid=tid: self._edit_tenant(tid),
                 on_delete=lambda checked, tid=tid: self._delete_tenant(tid)
             )
-            self._tbl.setCellWidget(r, 7, action_widget)
+            self._tbl.setCellWidget(r, 8, action_widget)
         self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenant(s) found")
 
     def _filter_table(self, query: str, reset_page: bool = True):
@@ -281,8 +285,8 @@ class TenantsPage(QWidget):
                     if (q in t["name"].lower() or q in t.get("contact","").lower())
                     and (sf == "All Sexes" or t.get("sex") == sf)]
                     
-        if hasattr(self, "_sort_col") and 0 <= self._sort_col < 7:
-            keys = ["id", "name", "contact", "birthdate", "sex", "start_date", "end_date"]
+        if hasattr(self, "_sort_col") and 0 <= self._sort_col < 8:
+            keys = ["id", "name", "contact", "birthdate", "sex", "room", "start_date", "end_date"]
             k = keys[self._sort_col]
             rev = (self._sort_order == Qt.DescendingOrder)
             filtered.sort(key=lambda x: str(x.get(k, "")).lower(), reverse=rev)
@@ -292,7 +296,7 @@ class TenantsPage(QWidget):
         self._reload_table(filtered)
 
     def _on_sort(self, col, order):
-        if col == 7: return # Action column
+        if col == 8: return # Action column
         
         # Manually toggle order if the same column is clicked since we hide the native indicator
         if self._sort_col == col:
