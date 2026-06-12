@@ -92,7 +92,7 @@ class ReportsPage(QWidget):
                 padding: 5px 24px 5px 10px;
                 color: {T.TEXT};
                 font-size: 12px;
-                text-align: left;
+                text-align: center;
             }}
             QPushButton:hover {{
                 border-color: {T.PRIMARY_SOFT};

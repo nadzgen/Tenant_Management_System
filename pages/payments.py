@@ -161,7 +161,7 @@ class PaymentDialog(QDialog):
         self.type_f.setStyleSheet(f"""
             QComboBox {{
                 background: {T.BG};
-                border: 1px solid {T.BORDER};
+                border: 1.5px solid {T.BORDER};
                 border-radius: 10px;
                 padding: 0 14px;
                 color: {T.TEXT};
