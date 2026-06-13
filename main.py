@@ -48,7 +48,7 @@ class AppShell(QWidget):
 
         h = QHBoxLayout(self)
         h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(0)
+        h.setSpacing(15)
 
         # Sidebar
         self.sidebar = Sidebar()
@@ -118,6 +118,24 @@ class MainWindow(QMainWindow):
         self.resize(1380, 880)
         self.setMinimumSize(1100, 720)
         self.setStyleSheet(f"QMainWindow {{ background:{T.BG}; }}")
+
+        # Match native Windows 11 titlebar color to the app background
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes.wintypes import DWORD, HWND
+                DWMWA_CAPTION_COLOR = 35
+                bg_hex = T.BG.lstrip("#")
+                r, g, b = int(bg_hex[0:2], 16), int(bg_hex[2:4], 16), int(bg_hex[4:6], 16)
+                colorref = r | (g << 8) | (b << 16)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    HWND(int(self.winId())),
+                    DWORD(DWMWA_CAPTION_COLOR),
+                    ctypes.byref(DWORD(colorref)),
+                    ctypes.sizeof(DWORD)
+                )
+            except Exception as e:
+                pass
 
         # Root stacked widget: login ↔ app shell
         self._root = QStackedWidget()

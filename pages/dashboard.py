@@ -7,9 +7,10 @@ Shows KPI cards, revenue chart, payment donut, and insight mini-cards.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QDate
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QListView, QScrollArea,
-    QGridLayout, QFrame, QSizePolicy,
+    QGridLayout, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
 )
 
 from theme import T
@@ -30,7 +31,7 @@ class DashboardPage(QWidget):
         self.stats = get_dashboard_stats()
         self.revenue_data = get_revenue_monthly()
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setContentsMargins(10, 1, 20, 21)
         self._build()
 
     def refresh(self):
@@ -51,15 +52,21 @@ class DashboardPage(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border:none; background:transparent; }")
+        scroll.setStyleSheet(f"QScrollArea {{ border: none; background: white; border-top-left-radius: 20px; border-bottom-left-radius: 20px; border-top-right-radius: 20px; border-bottom-right-radius: 20px; margin-right: 5px;}}")
+
+        eff = QGraphicsDropShadowEffect(scroll)
+        eff.setBlurRadius(28)
+        eff.setOffset(0, 6)
+        eff.setColor(QColor(15, 27, 45, 18))
+        scroll.setGraphicsEffect(eff)
         
         self.main_layout.addWidget(scroll)
 
         content = QWidget()
         scroll.setWidget(content)
         root = QVBoxLayout(content)
-        root.setContentsMargins(28, 12, 28, 28)
-        root.setSpacing(22)
+        root.setContentsMargins(20, 16, 20, 25)
+        root.setSpacing(16)
 
         # Load all stats from the database in one call
         current_month = QDate.currentDate().toString("yyyy-MM")
@@ -100,15 +107,16 @@ class DashboardPage(QWidget):
         period = CleanComboBox(["This Year", "Last 6 Months", "This Month"])
         period.setStyleSheet(f"""
             QPushButton {{
-                background: {T.BG};
+                background: {T.SURFACE};
                 border: 1px solid {T.BORDER};
                 border-radius: 8px;
                 padding: 5px 24px 5px 10px;
-                color: {T.TEXT};
+                color: {T.TEXT_MUTED};
                 font-size: 12px;
                 text-align: center;
             }}
             QPushButton:hover {{
+                color: {T.TEXT};
                 border-color: {T.PRIMARY_SOFT};
             }}
             QPushButton::menu-indicator {{

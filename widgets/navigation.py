@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QFrame, QLabel, QVBoxLayout, QHBoxLayout, QToolButton,
-    QButtonGroup, QLineEdit, QSizePolicy, QWidget,
+    QButtonGroup, QLineEdit, QSizePolicy, QWidget, QGraphicsDropShadowEffect
 )
 
 from icons import make_icon
@@ -33,8 +33,8 @@ class NavButton(QToolButton):
         self.setCheckable(True)
         self.setAutoExclusive(False)
         self.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        self.setIconSize(QSize(20, 20))
-        self.setMinimumHeight(44)
+        self.setIconSize(QSize(18, 18))
+        self.setMinimumHeight(38)
         self.setCursor(Qt.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._refresh(False)
@@ -42,14 +42,14 @@ class NavButton(QToolButton):
 
     def _refresh(self, checked: bool):
         color = "white"
-        self.setIcon(make_icon(self.icon_name, color, 20))
+        self.setIcon(make_icon(self.icon_name, color, 18))
         bg     = "rgba(255, 255, 255, 0.2)" if checked else "transparent"
-        weight = "600" if checked else "500"
+        weight = "700" if checked else "650"
         txt    = "white"
         self.setStyleSheet(
             f"QToolButton {{ background:{bg}; color:{txt}; border:none;"
-            f" border-radius:10px; padding:8px 12px; text-align:left;"
-            f" font-size:13px; font-weight:{weight}; }}"
+            f" border-radius:10px; padding:6px 10px; text-align:left;"
+            f" font-size:12px; font-weight:{weight}; }}"
             f"QToolButton:hover {{ background:rgba(255, 255, 255, 0.1); color:white; }}"
         )
 
@@ -66,10 +66,10 @@ class Sidebar(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(215)
+        self.setFixedWidth(212)
         self.setObjectName("Sidebar")
         self.setStyleSheet(
-            f"#Sidebar {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 #578DFA, stop:1 #0A2E8C); border-right:none; }}"
+            f"#Sidebar {{ background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 #578DFA, stop:1 #0A2E8C); border-right:none; border-top-right-radius: 20px}}"
         )
 
         root = QVBoxLayout(self)
@@ -87,9 +87,7 @@ class Sidebar(QFrame):
         lt = QVBoxLayout(); lt.setSpacing(0)
         t1 = QLabel("TMS")
         t1.setStyleSheet(f"color:white; font-size:20px; font-weight:800; background:transparent;")
-        t2 = QLabel("Tenant Management System")
-        t2.setStyleSheet(f"color:rgba(255, 255, 255, 0.8); font-size:9.5px; font-weight:600; letter-spacing:0.1px; background:transparent;")
-        lt.addWidget(t1); lt.addWidget(t2)
+        lt.addWidget(t1)
         logo.addLayout(lt); logo.addStretch(1)
         root.addLayout(logo)
 
@@ -122,17 +120,17 @@ class Sidebar(QFrame):
         logout_btn = NavButton("logout", "Logout")
         logout_btn.setStyleSheet(
             f"QToolButton {{ background:transparent; color:white; border:none;"
-            f" border-radius:10px; padding:8px 12px; text-align:left;"
-            f" font-size:13px; font-weight:500; }}"
+            f" border-radius:10px; padding:6px 10px; text-align:left;"
+            f" font-size:12px; font-weight:500; }}"
             f"QToolButton:hover {{ background:rgba(255, 255, 255, 0.1); color:white; }}"
         )
-        logout_btn.setIcon(make_icon("logout", "white", 20))
+        logout_btn.setIcon(make_icon("logout", "white", 18))
         logout_btn.setCheckable(False)
         logout_btn.clicked.connect(self.do_logout.emit)
         root.addWidget(logout_btn)
 
         # ── Footer card ─────────────────────────────────────────────────────
-        ver = QLabel("v1.0.0  ·  © 2025 TMS")
+        ver = QLabel("v1.0.0  ·  © 2026 TMS")
         ver.setAlignment(Qt.AlignCenter)
         ver.setStyleSheet(f"color:rgba(255, 255, 255, 0.6); font-size:10px; padding-top:6px; background:transparent;")
         root.addWidget(ver)
@@ -155,7 +153,8 @@ class TopHeader(QFrame):
                  user_initial: str = "", parent=None):
         super().__init__(parent)
         self.setFixedHeight(66)
-        self.setStyleSheet(f"background:{T.SURFACE}; border: none;")
+        self.setStyleSheet(f"background: transparent; border: none; border-top-left-radius: 20px; border-bottom-left-radius: 20px;")
+
 
         row = QHBoxLayout(self)
         row.setContentsMargins(28, 8, 28, 8)
@@ -164,7 +163,7 @@ class TopHeader(QFrame):
         # Title + breadcrumb
         title_col = QVBoxLayout(); title_col.setSpacing(0)
         self.title_lbl = QLabel(title)
-        self.title_lbl.setStyleSheet(f"color:{T.TEXT}; font-size:22px; font-weight:700;")
+        self.title_lbl.setStyleSheet(f"color:{T.TEXT}; font-size: 28px; font-weight:700;")
         title_col.addWidget(self.title_lbl)
         row.addLayout(title_col)
         row.addStretch(1)
@@ -175,10 +174,11 @@ class TopHeader(QFrame):
         self.avatar.setAlignment(Qt.AlignCenter)
         self.avatar.setCursor(Qt.PointingHandCursor)
         self.avatar.setStyleSheet(
-            f"background: qlineargradient(x1:1, y1:0, x2:0, y2:1, stop:0 #4785FF, stop:1 #0A2E8C);"
-            f" color:white; border-radius:12px; font-weight:700; font-size:15px;"
+            f"background: {T.PRIMARY};"
+            f" color:white; border-radius:21px; font-weight:700; font-size:15px;"
         )
         row.addWidget(self.avatar)
+        row.addSpacing(10)
 
     def set_context(self, title: str):
         self.title_lbl.setText(title)

@@ -50,6 +50,7 @@ class LoginPage(QWidget):
         left.setStyleSheet(
             f"background: qlineargradient(x1:0, y1:0, x2:1, y2:1,"
             f"stop:0 {T.PRIMARY}, stop:1 #1A4FCC);"
+            "border-top-right-radius: 40px;"
         )
         lv = QVBoxLayout(left)
         lv.setContentsMargins(52, 60, 52, 60)
@@ -124,7 +125,7 @@ class LoginPage(QWidget):
 
         cv = QVBoxLayout(card)
         cv.setContentsMargins(40, 44, 40, 44)
-        cv.setSpacing(18)
+        cv.setSpacing(16)
 
         # App icon
         icon_wrap = QFrame(); icon_wrap.setFixedSize(64, 64)
@@ -186,7 +187,9 @@ class LoginPage(QWidget):
         # Remember me + forgot password
         opts = QHBoxLayout()
         self.remember_cb = QCheckBox("Remember me")
-        self.remember_cb.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:12.5px;")
+        self.remember_cb.setStyleSheet(
+            f"color:{T.TEXT_MUTED}; font-size:12.5px;"
+        )
         opts.addWidget(self.remember_cb)
         opts.addStretch(1)
         forgot = QLabel(

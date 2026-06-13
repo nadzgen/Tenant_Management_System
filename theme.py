@@ -46,6 +46,6 @@ NAV_ITEMS = [
     ("users",     "Tenant Management",   2),
     ("door",      "Room Management",     3),
     ("wallet",    "Payment Tracking",    4),
-    ("chart",     "Reports & Analytics", 5),
+    ("chart",     "Reports and Analytics", 5),
     ("gear",      "Settings",            6),
 ]
