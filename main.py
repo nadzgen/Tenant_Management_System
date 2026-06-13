@@ -183,7 +183,7 @@ def main():
     app.setStyleSheet(f"""
         QCalendarWidget {{
             background-color: {T.SURFACE};
-            border: 5px solid {T.BORDER};
+            border: 5px solid {T.PRIMARY};
             border-radius: {T.RADIUS_SM}px;
             /* Padding ensures the sharp corners of the inner grid do not clip the rounded border */
             padding: 6px; 
@@ -191,7 +191,7 @@ def main():
         }}
         QCalendarWidget QWidget {{
             alternate-background-color: {T.BG};
-            background-color: transparent;
+            background-color: red;
             font-size: 11px;
         }}
         QCalendarWidget QToolButton {{

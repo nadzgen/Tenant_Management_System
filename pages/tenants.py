@@ -276,7 +276,7 @@ class TenantsPage(QWidget):
                 on_delete=lambda checked, tid=tid: self._delete_tenant(tid)
             )
             self._tbl.setCellWidget(r, 8, action_widget)
-        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenant(s) found")
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenants")
 
     def _filter_table(self, query: str, reset_page: bool = True):
         q = query.lower()

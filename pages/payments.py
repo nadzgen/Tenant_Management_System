@@ -420,7 +420,7 @@ class PaymentsPage(QWidget):
                 on_delete=lambda checked, pid=pid: self._delete_payment(pid)
             )
             self._tbl.setCellWidget(r, 6, action_widget)
-        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} payment record(s)")
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} payment records")
 
     def _apply_filters(self, reset_page: bool = True):
         q = self._search.text().lower()

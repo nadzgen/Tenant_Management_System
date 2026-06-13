@@ -73,22 +73,22 @@ class Sidebar(QFrame):
         )
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 16, 14, 18)
+        root.setContentsMargins(14, 14, 14, 18)
         root.setSpacing(8)
 
         # ── Logo block ──────────────────────────────────────────────────────
         logo = QHBoxLayout(); logo.setSpacing(10)
-        badge = QFrame(); badge.setFixedSize(38, 38)
-        badge.setStyleSheet(f"background:white; border-radius:10px;")
+        badge = QFrame(); badge.setFixedSize(41,41)
+        badge.setStyleSheet(f"background:rgba(255,255,255,0.18); border-radius:10px;")
         bl = QVBoxLayout(badge); bl.setContentsMargins(0, 0, 0, 0)
-        bl.addWidget(IconLabel("building", T.PRIMARY, 22), 0, Qt.AlignCenter)
+        bl.addWidget(IconLabel("building", "white", 33), 0, Qt.AlignCenter)
         logo.addWidget(badge)
 
         lt = QVBoxLayout(); lt.setSpacing(0)
         t1 = QLabel("TMS")
-        t1.setStyleSheet(f"color:white; font-size:18px; font-weight:800; background:transparent;")
+        t1.setStyleSheet(f"color:white; font-size:20px; font-weight:800; background:transparent;")
         t2 = QLabel("Tenant Management System")
-        t2.setStyleSheet(f"color:rgba(255, 255, 255, 0.8); font-size:9.5px; letter-spacing:0.1px; background:transparent;")
+        t2.setStyleSheet(f"color:rgba(255, 255, 255, 0.8); font-size:9.5px; font-weight:600; letter-spacing:0.1px; background:transparent;")
         lt.addWidget(t1); lt.addWidget(t2)
         logo.addLayout(lt); logo.addStretch(1)
         root.addLayout(logo)
@@ -158,7 +158,7 @@ class TopHeader(QFrame):
         self.setStyleSheet(f"background:{T.SURFACE}; border: none;")
 
         row = QHBoxLayout(self)
-        row.setContentsMargins(28, 14, 28, 8)
+        row.setContentsMargins(28, 8, 28, 8)
         row.setSpacing(20)
 
         # Title + breadcrumb

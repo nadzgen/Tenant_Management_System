@@ -277,7 +277,7 @@ class RoomsPage(QWidget):
                 on_delete=lambda checked, rid=rid: self._delete_room(rid)
             )
             self._tbl.setCellWidget(r, 7, action_widget)
-        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} room(s) listed")
+        self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} rooms")
 
     def _apply_filters(self, reset_page: bool = True):
         q = self._search.text().lower()
