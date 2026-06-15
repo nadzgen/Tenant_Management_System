@@ -98,7 +98,10 @@ class DeltaPill(QLabel):
         )
 
 
-class StatusBadge(QLabel):
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QPainter, QFontMetrics, QColor, QPainterPath
+
+class StatusBadge(QWidget):
     """Coloured pill for table status columns."""
 
     SCHEME = {
@@ -113,13 +116,48 @@ class StatusBadge(QLabel):
 
     def __init__(self, status: str, parent=None):
         super().__init__(parent)
-        color, soft = self.SCHEME.get(status, (T.TEXT_MUTED, T.DIVIDER))
-        self.setText(f"  {status}  ")
-        self.setAlignment(Qt.AlignCenter)
-        self.setStyleSheet(
-            f"background:{soft}; color:{color}; border-radius:10px;"
-            f" padding:3px 8px; font-weight:600; font-size:12px;"
-        )
+        self.status_text = status
+        color_str, soft_str = self.SCHEME.get(status, (T.TEXT_MUTED, T.DIVIDER))
+        
+        self.color = QColor(color_str)
+        self.bg_color = QColor(soft_str)
+        
+        self._base_text = f"  {status}  "
+        
+        self.setFixedHeight(24)
+        
+        f = self.font()
+        f.setBold(True)
+        f.setPixelSize(11)
+        self.setFont(f)
+
+    def sizeHint(self):
+        fm = QFontMetrics(self.font())
+        w = fm.horizontalAdvance(self._base_text)
+        return QSize(w, 24)
+        
+    def minimumSizeHint(self):
+        return QSize(50, 24)
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        p.setBrush(self.bg_color)
+        p.drawRoundedRect(self.rect(), 12, 12)
+        
+        p.setFont(self.font())
+        p.setPen(self.color)
+        
+        fm = p.fontMetrics()
+        y = (self.height() + fm.ascent() - fm.descent()) // 2
+        
+        path = QPainterPath()
+        path.addRoundedRect(self.rect(), 12, 12)
+        p.setClipPath(path)
+        
+        x = (self.width() - fm.horizontalAdvance(self._base_text)) // 2
+        p.drawText(x, y, self._base_text)
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +222,11 @@ class LineChart(QWidget):
         self.labels = labels
         self.setMinimumHeight(260)
 
+    def update_data(self, values: List[float], labels: List[str]):
+        self.values = values
+        self.labels = labels
+        self.update()
+
     def paintEvent(self, _):
         p = QPainter(self); p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
@@ -243,6 +286,10 @@ class DonutChart(QWidget):
         super().__init__(parent)
         self.segments = segments
         self.setMinimumSize(200, 200)
+
+    def update_data(self, segments: List[tuple]):
+        self.segments = segments
+        self.update()
 
     def paintEvent(self, _):
         p = QPainter(self); p.setRenderHint(QPainter.Antialiasing)
@@ -695,7 +742,8 @@ def primary_button(label: str, icon_name: str = "") -> QPushButton:
     return btn
 
 
-def ghost_button(label: str, icon_name: str = "", color: str = T.TEXT) -> QPushButton:
+def ghost_button(label: str, icon_name: str = "", color: str = None) -> QPushButton:
+    color = color or T.TEXT
     btn = QPushButton()
     if icon_name:
         btn.setIcon(make_icon(icon_name, color, 16))

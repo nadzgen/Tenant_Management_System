@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from icons import make_icon
 from theme import T
 from widgets.components import IconLabel
+from database.repositories import validate_login
 
 
 class LoginPage(QWidget):
@@ -187,10 +188,30 @@ class LoginPage(QWidget):
         # Remember me + forgot password
         opts = QHBoxLayout()
         self.remember_cb = QCheckBox("Remember me")
-        self.remember_cb.setStyleSheet(
-            f"color:{T.TEXT_MUTED}; font-size:12.5px;"
-        )
+        self.remember_cb.setCursor(Qt.PointingHandCursor)
+        self.remember_cb.setStyleSheet(f"""
+            QCheckBox {{
+                color: {T.TEXT_MUTED};
+                font-size: 13.5px;
+            }}
+            QCheckBox::indicator {{
+                width: 14px;
+                height: 14px;
+                border: 1.5px solid #94A3B8;
+                border-radius: 3px;
+                background: #FFFFFF;
+            }}
+            QCheckBox::indicator:hover {{
+                border: 1.5px solid {T.PRIMARY};
+            }}
+            QCheckBox::indicator:checked {{
+                background: #FFFFFF;
+                border: 1.5px solid {T.PRIMARY};
+                image: url(assets/check-black.svg);
+            }}
+        """)
         opts.addWidget(self.remember_cb)
+        
         opts.addStretch(1)
         forgot = QLabel(
             f"<a href='#' style='color:{T.PRIMARY}; text-decoration:none;'>Forgot password?</a>"
@@ -273,19 +294,12 @@ class LoginPage(QWidget):
             self._show_error("Please enter your password.")
             return
 
-        # TODO(DB): Verify user credentials here
-        # cursor.execute("SELECT id, password_hash FROM users WHERE username=?", (username,))
-        # row = cursor.fetchone()
-        # if not row or not check_password(password, row["password_hash"]):
-        #     self._show_error("Invalid username or password.")
-        #     return
-
-        # Demo credentials — remove when DB is connected
-        if username.lower() == "admin" and password == "admin":
+        # Verify user credentials using DB
+        if validate_login(username, password):
             self.error_lbl.hide()
             self.login_success.emit(username)
         else:
-            self._show_error("Invalid username or password.\nDemo credentials:  admin / admin")
+            self._show_error("Invalid username or password.")
 
     def _show_error(self, msg: str):
         self.error_lbl.setText(msg)

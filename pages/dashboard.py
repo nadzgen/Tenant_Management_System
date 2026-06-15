@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from theme import T
 from database.repositories import (
     get_dashboard_stats, get_payments,
-    get_revenue_monthly, get_revenue_labels,
+    get_revenue_trend
 )
 from widgets.components import (
     Card, KPICard, MiniInsightCard, LineChart, DonutChart,
@@ -27,17 +27,19 @@ from widgets.components import (
 class DashboardPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        from database.repositories import get_dashboard_stats, get_revenue_monthly
+        from database.repositories import get_dashboard_stats, get_revenue_trend
         self.stats = get_dashboard_stats()
-        self.revenue_data = get_revenue_monthly()
+        self.revenue_data, self.revenue_labels = get_revenue_trend("This Year")
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(10, 1, 20, 21)
         self._build()
 
     def refresh(self):
-        from database.repositories import get_dashboard_stats, get_revenue_monthly
+        from database.repositories import get_dashboard_stats, get_revenue_trend
         self.stats = get_dashboard_stats()
-        self.revenue_data = get_revenue_monthly()
+        # Keep the selected period
+        current_period = getattr(self, "_current_period", "This Year")
+        self.revenue_data, self.revenue_labels = get_revenue_trend(current_period)
         # Repaint or rebuild UI components if necessary. 
         # For a full implementation, you'd update the specific widgets instead of clearing.
         # This simple refresh just forces an update of the labels if they were decoupled.
@@ -71,9 +73,10 @@ class DashboardPage(QWidget):
         # Load all stats from the database in one call
         current_month = QDate.currentDate().toString("yyyy-MM")
         stats = get_dashboard_stats(current_month)
-        revenue_monthly = get_revenue_monthly()
-        revenue_labels  = get_revenue_labels()
-        payments        = get_payments(current_month)
+        
+        current_period = getattr(self, "_current_period", "This Year")
+        revenue_monthly, revenue_labels = get_revenue_trend(current_period)
+        payments = get_payments(current_month)
 
         paid_count    = stats["paid_count"]
         unpaid_count  = stats["unpaid_count"]
@@ -81,6 +84,8 @@ class DashboardPage(QWidget):
         vacant_units  = stats["vacant_units"]
         active_tenants = stats["active_tenants"]
         total_revenue  = stats["total_revenue"]
+        avg_rent       = stats.get("average_rent", 0)
+        proj_rev       = stats.get("projected_revenue", 0)
 
         # ── KPI row ─────────────────────────────────────────────────────────
         root.addWidget(section_title("Overview", "Today's property snapshot"))
@@ -100,7 +105,8 @@ class DashboardPage(QWidget):
         # Revenue trend card
         trend = Card(padding=22)
         trend_head = QHBoxLayout()
-        th = QLabel("Revenue Trend")
+        import datetime
+        th = QLabel(f"Revenue Trend — {datetime.datetime.now().year}")
         th.setStyleSheet(f"color:{T.TEXT}; font-size:15px; font-weight:700;")
         trend_head.addWidget(th); trend_head.addStretch(1)
         from widgets.components import CleanComboBox
@@ -128,9 +134,12 @@ class DashboardPage(QWidget):
                 height: 14px;
             }}
         """)
+        period.setCurrentText(current_period)
+        period.currentTextChanged.connect(self._on_period_changed)
         trend_head.addWidget(period)
         trend.body.addLayout(trend_head)
-        trend.body.addWidget(LineChart(revenue_monthly, revenue_labels))
+        self.revenue_chart = LineChart(revenue_monthly, revenue_labels)
+        trend.body.addWidget(self.revenue_chart)
         charts.addWidget(trend, 3)
         trend.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -185,14 +194,15 @@ class DashboardPage(QWidget):
         insights = QGridLayout(); insights.setSpacing(20)
         mini_cards = [
             ("Collection Rate",               collection_rate, "chart",  T.SUCCESS, T.SUCCESS_SOFT),
-            ("Vacant Units",                  str(vacant_units), "door", T.WARNING, T.WARNING_SOFT),
-            ("Projected Revenue (Next Month)","₱ 30,000",       "users", T.PURPLE,  T.PURPLE_SOFT),
+            ("Average Rent per Unit",         f"₱ {avg_rent:,}", "wallet", T.PRIMARY, T.PRIMARY_SOFT),
+            ("Projected Unpaid",              f"₱ {proj_rev:,}", "users", T.PURPLE,  T.PURPLE_SOFT),
         ]
         for i, args in enumerate(mini_cards):
             insights.addWidget(MiniInsightCard(*args), 0, i)
         root.addLayout(insights)
 
         # ── Recent activity ──────────────────────────────────────────────────
+
         root.addWidget(section_title("Recent Payments", "Last 10 recorded payments"))
         recent = Card(padding=20)
         from widgets.components import styled_table, set_table_item, set_badge_cell
@@ -210,4 +220,10 @@ class DashboardPage(QWidget):
         recent.body.addWidget(tbl)
         root.addWidget(recent)
         root.addStretch(1)
+
+    def _on_period_changed(self, text: str):
+        from database.repositories import get_revenue_trend
+        self._current_period = text
+        data, labels = get_revenue_trend(text)
+        self.revenue_chart.update_data(data, labels)
 

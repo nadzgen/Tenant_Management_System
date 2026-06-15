@@ -7,12 +7,13 @@ and process the initial payments (deposit + optional 1st month rent).
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
     QLineEdit, QComboBox, QDateEdit, QAbstractItemView, QMessageBox,
-    QCheckBox, QListView
+    QCheckBox, QListView, QApplication, QFrame, QPushButton, QDialog, QCalendarWidget
 )
+from PySide6.QtGui import QKeyEvent
 
 from theme import T
 from database.repositories import get_rooms
@@ -21,6 +22,140 @@ from widgets.components import (
     styled_table, set_table_item, set_badge_cell
 )
 
+
+class CustomDateSelector(QWidget):
+    def __init__(self, placeholder="14-06-2026", parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(42)
+        
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        
+        self.bg_frame = QFrame()
+        self.bg_frame.setStyleSheet(f"""
+            QFrame {{
+                background: {T.BG};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 10px;
+            }}
+        """)
+        self.bg_layout = QHBoxLayout(self.bg_frame)
+        self.bg_layout.setContentsMargins(14, 0, 10, 0)
+        self.bg_layout.setSpacing(5)
+        
+        self.line_edit = QLineEdit()
+        self.line_edit.setPlaceholderText(placeholder)
+        self.line_edit.setStyleSheet(f"""
+            QLineEdit {{
+                background: transparent;
+                border: none;
+                color: {T.TEXT};
+                font-size: 13px;
+            }}
+        """)
+        
+        self.btn = QPushButton("▼")
+        self.btn.setCursor(Qt.PointingHandCursor)
+        self.btn.setFixedSize(24, 24)
+        self.btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                border: none;
+                color: {T.TEXT_MUTED};
+                font-size: 10px;
+            }}
+            QPushButton:hover {{
+                color: {T.TEXT};
+            }}
+        """)
+        
+        self.bg_layout.addWidget(self.line_edit)
+        self.bg_layout.addWidget(self.btn)
+        self.layout.addWidget(self.bg_frame)
+        
+        self.btn.clicked.connect(self._show_calendar)
+        
+    def _show_calendar(self):
+        dialog = QDialog(self)
+        dialog.setWindowFlags(Qt.Popup)
+        dialog.setStyleSheet("QDialog { background: white; border: 1px solid #E2E8F0; border-radius: 8px; }")
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        cal = QCalendarWidget()
+        cal.setStyleSheet("""
+            QCalendarWidget {
+                background-color: white;
+                border: none;
+                color: #0F1B2D;
+            }
+            QCalendarWidget QWidget {
+                alternate-background-color: #F6F8FB;
+                background-color: white;
+                color: #0F1B2D;
+            }
+            QCalendarWidget QToolButton {
+                color: #4A5568;
+                font-size: 11px;
+                font-weight: 500;
+                background-color: transparent;
+                border: none;
+                border-radius: 4px;
+            }
+            QCalendarWidget QToolButton#qt_calendar_prevmonth {
+                qproperty-icon: url(none);
+                qproperty-text: "‹";
+                qproperty-toolButtonStyle: 1;
+                font-size: 17px;
+            }
+            QCalendarWidget QToolButton#qt_calendar_nextmonth {
+                qproperty-icon: url(none);
+                qproperty-text: "›";
+                qproperty-toolButtonStyle: 1;
+                font-size: 17px;
+            }
+            QCalendarWidget QToolButton:hover {
+                background-color: #F6F8FB;
+            }
+            QCalendarWidget QMenu {
+                background-color: white;
+                color: #0F1B2D;
+                border: 1px solid #E2E8F0;
+            }
+            QCalendarWidget QSpinBox {
+                background-color: white;
+                color: #0F1B2D;
+                border: 1px solid #E2E8F0;
+                selection-background-color: #0F1B2D;
+            }
+            QCalendarWidget QAbstractItemView:enabled {
+                color: #4A5568;
+                background-color: white;
+                selection-background-color: #0F1B2D;
+                selection-color: white;
+                border: none;
+                outline: none;
+            }
+        """)
+        layout.addWidget(cal)
+        
+        def on_date_selected(date: QDate):
+            self.line_edit.setText(date.toString("dd-MM-yyyy"))
+            dialog.accept()
+            
+        cal.clicked.connect(on_date_selected)
+        
+        pos = self.mapToGlobal(self.rect().bottomLeft())
+        dialog.move(pos.x(), pos.y() + 2)
+        dialog.exec()
+        
+    def date(self) -> QDate:
+        return QDate.fromString(self.line_edit.text(), "dd-MM-yyyy")
+        
+    def setDate(self, date: QDate):
+        self.line_edit.setText(date.toString("dd-MM-yyyy"))
 
 class StepIndicator(QWidget):
     """A visual breadcrumb/stepper showing current progress."""
@@ -54,6 +189,8 @@ class StepIndicator(QWidget):
 
 
 class OnboardingPage(QWidget):
+    discard_requested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tenant_data = {}
@@ -93,31 +230,7 @@ class OnboardingPage(QWidget):
         self.f_name = field("Full Name (e.g. Maria Santos)")
         self.f_contact = field("Contact Number (e.g. 09171234567)")
         
-        self.f_dob = QDateEdit()
-        self.f_dob.setCalendarPopup(True)
-        self.f_dob.setFixedHeight(42)
-        self.f_dob.setStyleSheet(f"""
-            QDateEdit {{
-                background: {T.BG};
-                border: 1.5px solid {T.BORDER};
-                border-radius: 10px;
-                padding: 0 14px;
-                color: {T.TEXT};
-                font-size: 13px;
-            }}
-            QDateEdit::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 32px;
-                border: none;
-            }}
-            QDateEdit::down-arrow {{
-                image: url(assets/chevron-down.svg);
-                width: 16px;
-                height: 16px;
-            }}
-        """)
-        self.f_dob.setDate(QDate(1990, 1, 1))
+        self.f_dob = CustomDateSelector("14-06-2026")
         
         self.f_sex = QComboBox()
         self.f_sex.addItems(["Female", "Male"])
@@ -154,10 +267,15 @@ class OnboardingPage(QWidget):
         lbl3 = QLabel("Birthdate"); lbl3.setStyleSheet(lbl_style); lay_tenant.addWidget(lbl3); lay_tenant.addWidget(self.f_dob)
         lbl4 = QLabel("Sex"); lbl4.setStyleSheet(lbl_style); lay_tenant.addWidget(lbl4); lay_tenant.addWidget(self.f_sex)
         lay_tenant.addStretch(1)
+        self.btn_discard = ghost_button("Discard", "trash")
+        self.btn_discard.clicked.connect(self.clear_fields)
         
         btn_next1 = primary_button("Next Step")
         btn_next1.clicked.connect(self._goto_step2)
-        r1 = QHBoxLayout(); r1.addStretch(1); r1.addWidget(btn_next1)
+        r1 = QHBoxLayout()
+        r1.addWidget(self.btn_discard)
+        r1.addStretch(1)
+        r1.addWidget(btn_next1)
         lay_tenant.addLayout(r1)
         self.w_tenant.body.addLayout(lay_tenant)
         self.stack.addWidget(self.w_tenant)
@@ -188,37 +306,20 @@ class OnboardingPage(QWidget):
         lay_pay.setSpacing(16)
         
         self.f_deposit = field("Deposit Amount")
+        self.f_deposit.setReadOnly(True)
+        self.f_deposit.setStyleSheet(f"background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT_MUTED}; font-size:13px;")
         
         self.cb_first_month = QCheckBox("Pay 1st Month Rent Now")
         self.cb_first_month.setChecked(True)
         self.cb_first_month.setStyleSheet(f"color:{T.TEXT}; font-size:14px; font-weight:600;")
         self.f_rent = field("1st Month Rent Amount")
+        self.f_rent.setReadOnly(True)
+        self.f_rent.setStyleSheet(f"background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT_MUTED}; font-size:13px;")
         
-        self.f_move_in = QDateEdit()
-        self.f_move_in.setCalendarPopup(True)
-        self.f_move_in.setFixedHeight(42)
-        self.f_move_in.setStyleSheet(f"""
-            QDateEdit {{
-                background: {T.BG};
-                border: 1.5px solid {T.BORDER};
-                border-radius: 10px;
-                padding: 0 14px;
-                color: {T.TEXT};
-                font-size: 13px;
-            }}
-            QDateEdit::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 32px;
-                border: none;
-            }}
-            QDateEdit::down-arrow {{
-                image: url(assets/chevron-down.svg);
-                width: 16px;
-                height: 16px;
-            }}
-        """)
-        self.f_move_in.setDate(QDate.currentDate())
+        self.f_move_in = CustomDateSelector("14-06-2026")
+        
+        # self.f_dob.setDate(QDate.currentDate())
+        # self.f_move_in.setDate(QDate.currentDate())
         
         lbl_dep = QLabel("Required Deposit (₱)"); lbl_dep.setStyleSheet(lbl_style); lay_pay.addWidget(lbl_dep); lay_pay.addWidget(self.f_deposit)
         lay_pay.addSpacing(10)
@@ -281,6 +382,16 @@ class OnboardingPage(QWidget):
     def _set_step(self, idx: int):
         self.stack.setCurrentIndex(idx)
         self.stepper.set_step(idx)
+
+    def clear_fields(self):
+        self.f_name.clear()
+        self.f_contact.clear()
+        self.f_sex.setCurrentIndex(0)
+        self.tenant_data = {}
+        self.room_data = None
+        self.payment_data = {}
+        self.tbl_rooms.clearSelection()
+        self.discard_requested.emit()
 
     def _goto_step2(self):
         name = self.f_name.text().strip()

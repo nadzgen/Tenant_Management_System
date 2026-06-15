@@ -138,8 +138,9 @@ class Sidebar(QFrame):
     def set_active(self, index: int):
         for btn in self.buttons:
             btn.setChecked(False)
-        if 0 <= index < len(self.buttons):
-            self.buttons[index].setChecked(True)
+        btn = self._group.button(index)
+        if btn:
+            btn.setChecked(True)
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +149,8 @@ class Sidebar(QFrame):
 
 class TopHeader(QFrame):
     """Top bar: page title, search, notification bell, avatar."""
+    
+    onboard_requested = Signal()
 
     def __init__(self, title: str = "Dashboard",
                  user_initial: str = "", parent=None):
@@ -168,6 +171,20 @@ class TopHeader(QFrame):
         row.addLayout(title_col)
         row.addStretch(1)
 
+        # Onboard (+) Button
+        self.add_btn = QToolButton()
+        self.add_btn.setIcon(make_icon("plus", "white", 20))
+        self.add_btn.setIconSize(QSize(20, 20))
+        self.add_btn.setFixedSize(42, 42)
+        self.add_btn.setCursor(Qt.PointingHandCursor)
+        self.add_btn.setStyleSheet(
+            f"QToolButton {{ background: {T.PRIMARY}; border-radius: 21px; }}"
+            f"QToolButton:hover {{ background: {T.PRIMARY_DK}; }}"
+        )
+        self.add_btn.clicked.connect(self.onboard_requested.emit)
+        row.addWidget(self.add_btn)
+        row.addSpacing(10)
+
         # Avatar
         self.avatar = QLabel(user_initial.upper())
         self.avatar.setFixedSize(42, 42)
@@ -175,7 +192,7 @@ class TopHeader(QFrame):
         self.avatar.setCursor(Qt.PointingHandCursor)
         self.avatar.setStyleSheet(
             f"background: {T.PRIMARY};"
-            f" color:white; border-radius:21px; font-weight:700; font-size:15px;"
+            f" color:white; border:none; border-radius:21px; font-weight:800; font-size:16px;"
         )
         row.addWidget(self.avatar)
         row.addSpacing(10)

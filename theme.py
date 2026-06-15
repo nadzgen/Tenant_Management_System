@@ -42,7 +42,6 @@ class T:
 # Navigation items: (icon_key, display_label, page_index)
 NAV_ITEMS = [
     ("home",      "Dashboard",           0),
-    ("user-plus", "Onboarding",          1),
     ("users",     "Tenant Management",   2),
     ("door",      "Room Management",     3),
     ("wallet",    "Payment Tracking",    4),

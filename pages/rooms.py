@@ -166,7 +166,7 @@ class RoomsPage(QWidget):
         # ── Summary KPIs ─────────────────────────────────────────────────────
         kpi_row = QHBoxLayout(); kpi_row.setSpacing(20)
         total    = len(self._data)
-        occupied = sum(1 for r in self._data if r["status"] == "Occupied")
+        occupied = sum(1 for r in self._data if r["status"] in ("Full", "Partially Occupied"))
         vacant   = sum(1 for r in self._data if r["status"] == "Vacant")
         kpi_row.addWidget(KPICard("Total Rooms",    str(total),    "door",   T.PRIMARY, T.PRIMARY_SOFT, "",  True, "All units"))
         kpi_row.addWidget(KPICard("Occupied",       str(occupied), "users",  T.SUCCESS, T.SUCCESS_SOFT, "",  True, "Tenants housed"))

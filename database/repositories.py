@@ -1,6 +1,64 @@
 import sqlite3
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from .db import get_connection
+
+def init_admin_table():
+    query = """
+        CREATE TABLE IF NOT EXISTS Admin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            email TEXT,
+            contact TEXT
+        )
+    """
+    try:
+        with get_connection() as conn:
+            conn.execute(query)
+            # Check if admin exists, if not create default
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Admin")
+            if cursor.fetchone()[0] == 0:
+                conn.execute(
+                    "INSERT INTO Admin (username, password, email, contact) VALUES (?, ?, ?, ?)",
+                    ("admin", "admin", "admin@example.com", "09171234567")
+                )
+    except sqlite3.OperationalError as e:
+        print(f"Warning (init_admin_table): {e}")
+
+# Call init_admin_table when module is loaded
+init_admin_table()
+
+def validate_login(username, password) -> bool:
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM Admin WHERE username=? AND password=?", (username, password))
+            return cursor.fetchone() is not None
+    except sqlite3.OperationalError:
+        return False
+
+def get_admin_profile() -> Dict[str, Any]:
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM Admin LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+    except sqlite3.OperationalError:
+        pass
+    return {"username": "admin", "email": "", "contact": ""}
+
+def update_admin_profile(username: str, email: str, contact: str):
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE Admin SET username=?, email=?, contact=? WHERE id=1",
+                (username, email, contact)
+            )
+    except sqlite3.OperationalError as e:
+        print(f"Warning (update_admin_profile): {e}")
 
 def get_tenants() -> List[Dict[str, Any]]:
     """
@@ -148,13 +206,16 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
     stats = {
         "active_tenants": 0,
         "vacant_units": 0,
+        "partially_occupied": 0,
+        "fully_occupied": 0,
         "occupied_rooms": 0,
-        "maintenance_rooms": 0,
         "total_rooms": 0,
         "paid_count": 0,
         "unpaid_count": 0,
         "overdue_count": 0,
-        "total_revenue": 0
+        "total_revenue": 0,
+        "average_rent": 0,
+        "projected_revenue": 0
     }
     
     try:
@@ -175,9 +236,26 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
             row = cursor.fetchone()
             if row: stats["vacant_units"] = row[0]
             
+            cursor.execute("SELECT COUNT(*) FROM Room WHERE occupied_slots > 0 AND occupied_slots < capacity")
+            row = cursor.fetchone()
+            if row: stats["partially_occupied"] = row[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM Room WHERE occupied_slots = capacity")
+            row = cursor.fetchone()
+            if row: stats["fully_occupied"] = row[0]
+            
             cursor.execute("SELECT COUNT(*) FROM Room WHERE occupied_slots > 0")
             row = cursor.fetchone()
             if row: stats["occupied_rooms"] = row[0]
+            
+            # Rent calculations
+            cursor.execute("SELECT AVG(monthly_rent) FROM Room")
+            row = cursor.fetchone()
+            if row and row[0]: stats["average_rent"] = int(row[0])
+            
+            cursor.execute("SELECT SUM(amount) FROM Payment WHERE status != 'Paid'")
+            row = cursor.fetchone()
+            if row and row[0]: stats["projected_revenue"] = int(row[0])
             
             # Payment stats
             if month:
@@ -211,36 +289,76 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
         
     return stats
 
-def get_revenue_monthly() -> List[int]:
-    """
-    Fallback mock implementation for monthly revenue chart data, as the schema 
-    doesn't easily provide 12 months of historical data without more complex date parsing
-    and assuming data density. In a full implementation, you would GROUP BY strftime('%m', payment_date).
-    """
+def get_revenue_trend(period: str = "This Year") -> Tuple[List[float], List[str]]:
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT strftime('%m', payment_date) as month, SUM(amount) 
-                FROM Payment 
-                WHERE status = 'Paid' AND payment_date IS NOT NULL
-                GROUP BY month
-                ORDER BY month
-            """)
-            # Initialize 12 months to 0
-            monthly = [0] * 12
-            for row in cursor.fetchall():
-                # month is '01' to '12'
-                m_idx = int(row["month"]) - 1
-                monthly[m_idx] = int(row[1])
-            return monthly
-    except (sqlite3.OperationalError, TypeError) as e:
-        print(f"Warning (get_revenue_monthly): {e}")
-        # Return fallback mock data to prevent UI from breaking if DB is empty
-        return [12000, 15500, 17000, 21000, 19500, 23000, 24500, 26000, 28500, 27000, 31000, 28000]
-
-def get_revenue_labels() -> List[str]:
-    return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+            if period == "This Year":
+                cursor.execute("""
+                    SELECT strftime('%m', payment_date) as month, SUM(amount) 
+                    FROM Payment 
+                    WHERE status = 'Paid' AND payment_date IS NOT NULL AND strftime('%Y', payment_date) = strftime('%Y', 'now')
+                    GROUP BY month ORDER BY month
+                """)
+                data = [0] * 12
+                labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+                for row in cursor.fetchall():
+                    data[int(row["month"]) - 1] = int(row[1])
+                return data, labels
+                
+            elif period == "Last 6 Months":
+                cursor.execute("""
+                    SELECT strftime('%Y-%m', payment_date) as month, SUM(amount)
+                    FROM Payment
+                    WHERE status = 'Paid' AND payment_date IS NOT NULL AND payment_date >= date('now', 'start of month', '-5 months')
+                    GROUP BY month ORDER BY month
+                """)
+                import datetime, calendar
+                now = datetime.datetime.now()
+                labels = []
+                data = [0] * 6
+                # Generate last 6 months labels
+                for i in range(5, -1, -1):
+                    m = now.month - i
+                    y = now.year
+                    while m <= 0:
+                        m += 12
+                        y -= 1
+                    labels.append(calendar.month_abbr[m])
+                
+                # Map fetched YYYY-MM
+                res = {row["month"]: int(row[1]) for row in cursor.fetchall()}
+                for i in range(6):
+                    m = now.month - (5 - i)
+                    y = now.year
+                    while m <= 0:
+                        m += 12
+                        y -= 1
+                    key = f"{y}-{m:02d}"
+                    data[i] = res.get(key, 0)
+                return data, labels
+                
+            elif period == "This Month":
+                cursor.execute("""
+                    SELECT 
+                        (cast(strftime('%d', payment_date) as integer) - 1) / 7 + 1 as week,
+                        SUM(amount)
+                    FROM Payment
+                    WHERE status = 'Paid' AND payment_date IS NOT NULL AND strftime('%Y-%m', payment_date) = strftime('%Y-%m', 'now')
+                    GROUP BY week ORDER BY week
+                """)
+                data = [0] * 4
+                labels = ["Week 1", "Week 2", "Week 3", "Week 4+"]
+                for row in cursor.fetchall():
+                    week_idx = int(row["week"]) - 1
+                    if week_idx >= 3: week_idx = 3 # cap at week 4
+                    data[week_idx] += int(row[1])
+                return data, labels
+                
+    except Exception as e:
+        print(f"Warning (get_revenue_trend): {e}")
+        
+    return [0]*12, ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 def delete_tenant(tenant_id: int):
     """

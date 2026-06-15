@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from theme import T
 from database.repositories import (
-    get_dashboard_stats, get_revenue_monthly, get_revenue_labels,
+    get_dashboard_stats, get_revenue_trend,
 )
 from widgets.components import (
     Card, KPICard, MiniInsightCard, LineChart, DonutChart,
@@ -27,9 +27,11 @@ class ReportsPage(QWidget):
         super().__init__(parent)
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self._current_period = "This Year"
         self._build()
 
     def refresh(self):
+        # We don't want to lose the current_period when refreshing
         while self.main_layout.count():
             child = self.main_layout.takeAt(0)
             if child.widget(): child.widget().deleteLater()
@@ -50,17 +52,21 @@ class ReportsPage(QWidget):
         # Load all stats from the database
         current_month   = QDate.currentDate().toString("yyyy-MM")
         stats           = get_dashboard_stats(current_month)
-        revenue_monthly = get_revenue_monthly()
-        revenue_labels  = get_revenue_labels()
+        revenue_monthly, revenue_labels = get_revenue_trend(self._current_period)
 
         paid_count    = stats["paid_count"]
         unpaid_count  = stats["unpaid_count"]
         overdue_count = stats["overdue_count"]
+        
+        fully_occupied     = stats["fully_occupied"]
+        partially_occupied = stats["partially_occupied"]
+        vacant_units       = stats["vacant_units"]
+        
         occupied_rooms = stats["occupied_rooms"]
-        vacant_units   = stats["vacant_units"]
         total_rooms    = stats["total_rooms"] or 1
         total_revenue  = stats["total_revenue"]
-        maint          = 0  # No maintenance status in current schema
+        avg_rent       = stats.get("average_rent", 0)
+        proj_rev       = stats.get("projected_revenue", 0)
 
         occupancy_rate = f"{round(occupied_rooms / total_rooms * 100)}%"
 
@@ -79,7 +85,8 @@ class ReportsPage(QWidget):
         root.addWidget(section_title("Revenue Trend", "Monthly income over the year"))
         trend = Card(padding=22)
         head = QHBoxLayout()
-        th = QLabel("Revenue Trend — 2025")
+        import datetime
+        th = QLabel(f"Revenue Trend — {datetime.datetime.now().year}")
         th.setStyleSheet(f"color:{T.TEXT}; font-size:15px; font-weight:700;")
         head.addWidget(th); head.addStretch(1)
         from widgets.components import CleanComboBox
@@ -106,9 +113,12 @@ class ReportsPage(QWidget):
                 height: 14px;
             }}
         """)
+        period.setCurrentText(self._current_period)
+        period.currentTextChanged.connect(self._on_period_changed)
         head.addWidget(period)
         trend.body.addLayout(head)
-        trend.body.addWidget(LineChart(revenue_monthly, revenue_labels))
+        self.revenue_chart = LineChart(revenue_monthly, revenue_labels)
+        trend.body.addWidget(self.revenue_chart)
         root.addWidget(trend)
 
         # ── Charts row: donut + occupancy ────────────────────────────────────
@@ -157,15 +167,15 @@ class ReportsPage(QWidget):
         occ_card.body.addWidget(oh)
         o_row = QHBoxLayout(); o_row.setSpacing(20)
         o_row.addWidget(DonutChart([
-            ("Occupied",    occupied_rooms, T.SUCCESS),
-            ("Vacant",      vacant_units,   T.PRIMARY),
-            ("Maintenance", maint,          T.WARNING),
+            ("Fully Occupied",      fully_occupied,     T.SUCCESS),
+            ("Partially Occupied",  partially_occupied, T.WARNING),
+            ("Vacant",              vacant_units,       T.PRIMARY),
         ]), 1)
         olegend = QVBoxLayout(); olegend.setSpacing(14)
         for label, count, color in [
-            ("Occupied",    occupied_rooms, T.SUCCESS),
-            ("Vacant",      vacant_units,   T.PRIMARY),
-            ("Maintenance", maint,          T.WARNING),
+            ("Fully Occupied",      fully_occupied,     T.SUCCESS),
+            ("Partially Occupied",  partially_occupied, T.WARNING),
+            ("Vacant",              vacant_units,       T.PRIMARY),
         ]:
             row = QHBoxLayout(); row.setSpacing(10)
             dot = QFrame(); dot.setFixedSize(10, 10)
@@ -190,13 +200,19 @@ class ReportsPage(QWidget):
         root.addWidget(section_title("Key Metrics", "Performance indicators at a glance"))
         grid = QGridLayout(); grid.setSpacing(20)
         mini = [
-            ("Average Rent per Unit",         "₱ 6,500",        "wallet", T.PRIMARY, T.PRIMARY_SOFT),
+            ("Average Rent per Unit",         f"₱ {avg_rent:,}",        "wallet", T.PRIMARY, T.PRIMARY_SOFT),
             ("Collection Rate",               collection_rate,   "chart",  T.SUCCESS, T.SUCCESS_SOFT),
             ("Vacant Units",                  str(vacant_units), "door",   T.WARNING, T.WARNING_SOFT),
-            ("Projected Revenue (Next Month)","₱ 30,000",        "users",  T.PURPLE,  T.PURPLE_SOFT),
+            ("Projected Unpaid",              f"₱ {proj_rev:,}",        "users",  T.PURPLE,  T.PURPLE_SOFT),
         ]
         for i, args in enumerate(mini):
             grid.addWidget(MiniInsightCard(*args), 0, i)
         root.addLayout(grid)
         root.addStretch(1)
+
+    def _on_period_changed(self, text: str):
+        from database.repositories import get_revenue_trend
+        self._current_period = text
+        data, labels = get_revenue_trend(text)
+        self.revenue_chart.update_data(data, labels)
 
