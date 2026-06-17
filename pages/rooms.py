@@ -9,6 +9,7 @@ TODO(DB): Replace ROOMS list operations with SQLite queries.
 from __future__ import annotations
 
 import copy
+import re
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
@@ -104,11 +105,26 @@ class RoomDialog(QDialog):
         self.rent_f = field("e.g. 5000", self.record.get("rent", ""))
         form.addRow(lbl4, self.rent_f)
 
-        lbl5 = QLabel("Status"); lbl5.setStyleSheet(lbl_style)
-        self.status_f = combo(["Full","Partially Occupied","Vacant"], self.record.get("status","Vacant"))
-        form.addRow(lbl5, self.status_f)
-
         lay.addLayout(form)
+
+        # Lock capacity to 1 for Solo types
+        def _on_type_changed(t):
+            if t in ("Solo", "Solo Deluxe"):
+                self.cap_f.setText("1")
+                self.cap_f.setReadOnly(True)
+                self.cap_f.setStyleSheet(
+                    f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
+                    f" border-radius:10px; padding:0 14px; color:{T.TEXT_MUTED}; font-size:13px; }}"
+                )
+            else:
+                self.cap_f.setReadOnly(False)
+                self.cap_f.setStyleSheet(
+                    f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
+                    f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
+                    f"QLineEdit:focus {{ border:1.5px solid {T.PRIMARY}; }}"
+                )
+        self.type_f.currentTextChanged.connect(_on_type_changed)
+        _on_type_changed(self.type_f.currentText())  # apply on open
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.button(QDialogButtonBox.Ok).setText("Save Room")
@@ -126,14 +142,56 @@ class RoomDialog(QDialog):
         lay.addWidget(btns)
 
     def _on_accept(self):
-        self.record["number"]   = self.num_f.text().strip()
-        self.record["type"]     = self.type_f.currentText()
-        self.record["capacity"] = self.cap_f.text().strip()
-        self.record["rent"]     = self.rent_f.text().strip()
-        self.record["status"]   = self.status_f.currentText()
-        if not self.record["number"]:
-            QMessageBox.warning(self, "Validation", "Room number is required.")
+        ok = True
+        base = "border-radius:10px; padding:0 14px; font-size:13px;"
+        ok_style  = f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER}; color:{T.TEXT}; {base} }}"
+        err_style = f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.DANGER}; color:{T.TEXT}; {base} }}"
+
+        number = self.num_f.text().strip()
+
+        if not re.match(r'^[A-Za-z0-9-]+$', number):
+            self.num_f.setStyleSheet(err_style)
+            ok = False
+        else:
+            self.num_f.setStyleSheet(ok_style)
+
+        cap = self.cap_f.text().strip()
+        if not cap or not cap.isdigit():
+            self.cap_f.setStyleSheet(err_style)
+            ok = False
+        else:
+            self.cap_f.setStyleSheet(ok_style)
+
+        rent = self.rent_f.text().strip()
+
+        try:
+            rent = round(float(rent))
+            if rent < 0:
+                raise ValueError
+            self.rent_f.setStyleSheet(ok_style)
+        except ValueError:
+            self.rent_f.setStyleSheet(err_style)
+            ok = False
+
+        if not ok:
             return
+
+        # Check duplicate room number (skip self when editing)
+        from database.repositories import get_rooms
+        existing = get_rooms()
+        own_id = str(self.record.get("id", ""))
+        for r in existing:
+            if r["number"] == number and str(r.get("id", "")) != own_id:
+                self.num_f.setStyleSheet(err_style)
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Duplicate", f"Room number '{number}' already exists.")
+                return
+
+        self.record["number"]   = number
+        self.record["type"]     = self.type_f.currentText()
+        self.record["capacity"] = cap
+        self.record["rent"]     = rent
+        self.record["status"]   = "Vacant"
         self.accept()
 
 

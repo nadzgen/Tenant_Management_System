@@ -497,10 +497,16 @@ def add_room(record: dict) -> int:
             cursor.execute("""
                 INSERT INTO Room (room_number, room_type, capacity, occupied_slots, monthly_rent, deposit)
                 VALUES (?, ?, ?, 0, ?, ?)
-            """, (record.get("number"), record.get("type"), record.get("capacity"), record.get("rent", 0), record.get("rent", 0)))
+            """, (
+                record.get("number"),
+                record.get("type"),
+                int(record.get("capacity", 1)),
+                int(record.get("rent", 0)),
+                int(record.get("rent", 0))
+            ))
             conn.commit()
             return cursor.lastrowid
-    except sqlite3.OperationalError as e:
+    except Exception as e:
         print(f"Warning (add_room): {e}")
         return 0
 
@@ -512,9 +518,9 @@ def update_room(room_id: int, record: dict):
                 UPDATE Room 
                 SET room_number=?, room_type=?, capacity=?, monthly_rent=?
                 WHERE RoomID=?
-            """, (record.get("number"), record.get("type"), record.get("capacity"), record.get("rent"), room_id))
+            """, (record.get("number"), record.get("type"), int(record.get("capacity", 1)), int(record.get("rent", 0)), room_id))
             conn.commit()
-    except sqlite3.OperationalError as e:
+    except Exception as e:
         print(f"Warning (update_room): {e}")
 
 def delete_room(room_id: int):
