@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QDate, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget, QHeaderView,
     QLineEdit, QComboBox, QDateEdit, QAbstractItemView, QMessageBox,
     QCheckBox, QListView, QApplication, QFrame, QPushButton, QDialog, QCalendarWidget
 )
@@ -46,6 +46,8 @@ class CustomDateSelector(QWidget):
         
         self.line_edit = QLineEdit()
         self.line_edit.setPlaceholderText(placeholder)
+        self.line_edit.setReadOnly(True)
+        self.line_edit.setCursor(Qt.PointingHandCursor)
         self.line_edit.setStyleSheet(f"""
             QLineEdit {{
                 background: transparent;
@@ -54,6 +56,7 @@ class CustomDateSelector(QWidget):
                 font-size: 13px;
             }}
         """)
+        self.line_edit.mousePressEvent = lambda e: self._show_calendar()
         
         self.btn = QPushButton("▼")
         self.btn.setCursor(Qt.PointingHandCursor)
@@ -75,6 +78,8 @@ class CustomDateSelector(QWidget):
         self.layout.addWidget(self.bg_frame)
         
         self.btn.clicked.connect(self._show_calendar)
+        self.bg_frame.setCursor(Qt.PointingHandCursor)
+        self.bg_frame.mousePressEvent = lambda e: self._show_calendar()
         
     def _show_calendar(self):
         dialog = QDialog(self)
@@ -143,6 +148,13 @@ class CustomDateSelector(QWidget):
         
         def on_date_selected(date: QDate):
             self.line_edit.setText(date.toString("dd-MM-yyyy"))
+            self.bg_frame.setStyleSheet(f"""
+                QFrame {{
+                    background: {T.BG};
+                    border: 1.5px solid {T.BORDER};
+                    border-radius: 10px;
+                }}
+            """)
             dialog.accept()
             
         cal.clicked.connect(on_date_selected)
@@ -188,15 +200,15 @@ class StepIndicator(QWidget):
                 lbl.setStyleSheet(f"color:{T.TEXT_SUBTLE}; font-size:14px; font-weight:500;")
 
 
-class OnboardingPage(QWidget):
-    discard_requested = Signal()
-
+class OnboardingDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowTitle("Tenant Onboarding")
+        self.setMinimumSize(620, 700)
+        self.setStyleSheet(f"background:{T.SURFACE};")
         self.tenant_data = {}
         self.room_data = None
         self.payment_data = {}
-        
         self._build()
         
     def refresh(self):
@@ -205,10 +217,8 @@ class OnboardingPage(QWidget):
 
     def _build(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 12, 28, 28)
+        root.setContentsMargins(24, 20, 24, 24)
         root.setSpacing(20)
-        
-        root.addWidget(section_title("Tenant Onboarding", "Streamlined move-in process"))
         
         self.stepper = StepIndicator(["Tenant Details", "Select Room", "Initial Payments", "Review"])
         root.addWidget(self.stepper)
@@ -228,7 +238,15 @@ class OnboardingPage(QWidget):
             return le
             
         self.f_name = field("Full Name (e.g. Maria Santos)")
+        self.btn_next1 = primary_button("Next Step")
         self.f_contact = field("Contact Number (e.g. 09171234567)")
+
+        ok_style = (
+            f"background:{T.BG}; border:1.5px solid {T.BORDER};"
+            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px;"
+        )
+        self.f_name.textChanged.connect(lambda t: self.f_name.setStyleSheet(ok_style) if t.strip() else None)
+        self.f_contact.textChanged.connect(lambda t: self.f_contact.setStyleSheet(ok_style) if t.strip() else None)
         
         self.f_dob = CustomDateSelector("14-06-2026")
         
@@ -270,12 +288,11 @@ class OnboardingPage(QWidget):
         self.btn_discard = ghost_button("Discard", "trash")
         self.btn_discard.clicked.connect(self.clear_fields)
         
-        btn_next1 = primary_button("Next Step")
-        btn_next1.clicked.connect(self._goto_step2)
+        self.btn_next1.clicked.connect(self._goto_step2)
         r1 = QHBoxLayout()
         r1.addWidget(self.btn_discard)
         r1.addStretch(1)
-        r1.addWidget(btn_next1)
+        r1.addWidget(self.btn_next1)
         lay_tenant.addLayout(r1)
         self.w_tenant.body.addLayout(lay_tenant)
         self.stack.addWidget(self.w_tenant)
@@ -287,6 +304,18 @@ class OnboardingPage(QWidget):
         
         self.tbl_rooms = styled_table(["Room ID", "Number", "Type", "Capacity", "Rent", "Status"])
         self.tbl_rooms.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tbl_rooms.setMinimumHeight(260)
+
+        hh = self.tbl_rooms.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Room ID
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Number
+        hh.setSectionResizeMode(2, QHeaderView.Stretch)           # Type stretches
+        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Capacity
+        hh.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Rent
+        hh.setSectionResizeMode(5, QHeaderView.Fixed)             # Status
+        self.tbl_rooms.setColumnWidth(5, 140)
+
+        self.tbl_rooms.verticalHeader().setDefaultSectionSize(38)
         self._load_rooms()
         lay_room.addWidget(self.tbl_rooms)
         
@@ -391,16 +420,56 @@ class OnboardingPage(QWidget):
         self.room_data = None
         self.payment_data = {}
         self.tbl_rooms.clearSelection()
-        self.discard_requested.emit()
+        self.reject()
 
     def _goto_step2(self):
+        ok = True
         name = self.f_name.text().strip()
+        contact = self.f_contact.text().strip()
+
+        base = (
+            f"border-radius:10px; padding:0 14px; font-size:13px;"
+        )
+        ok_style   = f"background:{T.BG}; border:1.5px solid {T.BORDER}; color:{T.TEXT}; " + base
+        err_style  = f"background:{T.BG}; border:1.5px solid {T.DANGER}; color:{T.TEXT}; " + base
+
         if not name:
-            QMessageBox.warning(self, "Required", "Full Name is required.")
+            self.f_name.setStyleSheet(err_style)
+            ok = False
+        else:
+            self.f_name.setStyleSheet(ok_style)
+
+        if not contact or not contact.isdigit():
+            self.f_contact.setStyleSheet(err_style)
+            ok = False
+        else:
+            self.f_contact.setStyleSheet(ok_style)
+
+        dob = self.f_dob.date()
+        if not dob.isValid():
+            self.f_dob.bg_frame.setStyleSheet(f"""
+                QFrame {{
+                    background: {T.BG};
+                    border: 1.5px solid {T.DANGER};
+                    border-radius: 10px;
+                }}
+            """)
+            ok = False
+        else:
+            self.f_dob.bg_frame.setStyleSheet(f"""
+                QFrame {{
+                    background: {T.BG};
+                    border: 1.5px solid {T.BORDER};
+                    border-radius: 10px;
+                }}
+            """)
+
+        if not ok:
             return
+
         self.tenant_data = {
             "name": name,
-            "contact": self.f_contact.text().strip(),
+            "contact": contact,
             "birthdate": self.f_dob.date().toString("yyyy-MM-dd"),
             "sex": self.f_sex.currentText()
         }
@@ -484,4 +553,4 @@ class OnboardingPage(QWidget):
         self.f_deposit.clear()
         self.cb_first_month.setChecked(True)
         self.tbl_rooms.clearSelection()
-        self._set_step(0)
+        self.accept()

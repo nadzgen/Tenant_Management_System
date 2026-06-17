@@ -24,7 +24,7 @@ from icons import make_icon
 # Pages
 from pages.login import LoginPage
 from pages.dashboard import DashboardPage
-from pages.onboarding import OnboardingPage
+from pages.onboarding import OnboardingDialog
 from pages.tenants import TenantsPage
 from pages.rooms import RoomsPage
 from pages.payments import PaymentsPage
@@ -82,7 +82,7 @@ class AppShell(QWidget):
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
         self._pages_cache = {}
-        for i in range(7):
+        for i in range(6):
             self.stack.addWidget(QWidget())
 
         v.addWidget(self.stack, 1)
@@ -90,16 +90,13 @@ class AppShell(QWidget):
 
         # Wire navigation
         self.sidebar.navigate.connect(self._navigate)
-        self.header.onboard_requested.connect(lambda: self._navigate(1))
+        self.header.onboard_requested.connect(self._open_onboarding)
         self._navigate(0)  # start on Dashboard
 
     def _navigate(self, index: int):
         if index not in self._pages_cache:
             if index == 0: self._pages_cache[0] = DashboardPage()
-            elif index == 1:
-                p = OnboardingPage()
-                p.discard_requested.connect(lambda: self._navigate(0))
-                self._pages_cache[1] = p
+            elif index == 1: pass 
             elif index == 2: self._pages_cache[2] = TenantsPage()
             elif index == 3: self._pages_cache[3] = RoomsPage()
             elif index == 4: self._pages_cache[4] = PaymentsPage()
@@ -116,7 +113,8 @@ class AppShell(QWidget):
             self.stack.insertWidget(index, self._pages_cache[index])
             old.deleteLater()
 
-        self.stack.setCurrentIndex(index)
+        if index != 1:
+            self.stack.setCurrentIndex(index)
         page = self._pages_cache[index]
         if hasattr(page, "refresh"):
             page.refresh()
@@ -133,6 +131,15 @@ class AppShell(QWidget):
             if index == 1:
                 self.header.set_context("Onboarding")
                 self.sidebar.set_active(-1)  # Clear selection in sidebar
+
+    def _open_onboarding(self):
+        from pages.onboarding import OnboardingDialog
+        dlg = OnboardingDialog(self)
+        dlg.exec()
+        # Refresh dashboard/tenants/rooms/payments if open
+        for idx in [0, 2, 3, 4]:
+            if idx in self._pages_cache and hasattr(self._pages_cache[idx], "refresh"):
+                self._pages_cache[idx].refresh()
 
     def set_user(self, username: str):
         self._current_user = username
