@@ -20,7 +20,7 @@ from database.repositories import get_tenants, get_payments, get_rooms, get_admi
 from theme import T
 from icons import make_icon
 from widgets.components import (
-    Card, section_title, primary_button, ghost_button, IconLabel,
+    Card, section_title, primary_button, ghost_button, IconLabel, Toast
 )
 
 
@@ -100,7 +100,8 @@ class SettingsPage(QWidget):
         update_admin_profile(name, email, phone)
         self.set_user(name)
         self.profile_updated.emit(name)
-        self._toast("Profile saved. You must use this new name to log in.")
+        # self._toast("Profile saved. You must use this new name to log in.")
+        Toast("Profile saved. Use your new name to log in.", "blue").show_in(self)
 
     def _build(self):
         scroll = QScrollArea(self)
@@ -233,6 +234,7 @@ class SettingsPage(QWidget):
                     writer = csv.DictWriter(f, fieldnames=keys)
                     writer.writeheader()
                     writer.writerows(data)
-                self._toast(f"Successfully exported {name} to CSV.")
+                # self._toast(f"Successfully exported {name} to CSV.")
+                Toast(f"{name} exported to CSV.", "green").show_in(self)
             except Exception as e:
                 self._toast(f"Error exporting CSV: {e}")

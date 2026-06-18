@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 from theme import T
 from database.repositories import get_tenants
 from widgets.components import (
-    Card, section_title, styled_table, set_table_item,
+    Card, section_title, styled_table, set_table_item, Toast, 
     primary_button, ghost_button, danger_button, search_bar, PaginationControl, table_action_cell, filter_button
 )
 
@@ -334,6 +334,7 @@ class TenantsPage(QWidget):
             from database.repositories import add_tenant
             if add_tenant(rec):
                 self.refresh()
+                Toast("Tenant created successfully.", "green").show_in(self)
 
     def _edit_tenant(self, tid: str = None):
         if not isinstance(tid, str):
@@ -352,6 +353,7 @@ class TenantsPage(QWidget):
             if edit_tid is not None:
                 update_tenant(int(edit_tid), rec)
             self.refresh()
+            Toast("Tenant updated successfully.", "blue").show_in(self)
 
     def _delete_tenant(self, tid: str = None):
         if not isinstance(tid, str):
@@ -375,3 +377,4 @@ class TenantsPage(QWidget):
             if del_tid is not None:
                 delete_tenant(int(del_tid))
             self.refresh()
+            Toast("Tenant deleted.", "red").show_in(self)

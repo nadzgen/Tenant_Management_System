@@ -10,13 +10,13 @@ from __future__ import annotations
 import math
 from typing import List
 
-from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal
+from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import (
     QColor, QPainter, QPainterPath, QPen, QBrush, QFont,
     QLinearGradient,
 )
 from PySide6.QtWidgets import (
-    QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
+    QGraphicsOpacityEffect, QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
     QGraphicsDropShadowEffect, QSizePolicy, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea,
     QComboBox, QListView, QToolButton, QMenu,
@@ -1026,3 +1026,95 @@ class CleanComboBox(QPushButton):
         self._menu.clear()
         self._current_index = -1
         self.setText("")
+
+# ---------------------------------------------------------------------------
+# Toast Notification
+# ---------------------------------------------------------------------------
+
+class Toast(QWidget):
+
+    _COLORS = {
+        "green": (T.SUCCESS,  T.SUCCESS_SOFT,  "#15803D"),
+        "blue":  (T.PRIMARY,  T.PRIMARY_SOFT,  "#1E55D6"),
+        "red":   (T.DANGER,   T.DANGER_SOFT,   "#B91C1C"),
+    }
+
+    def __init__(self, message: str, color: str = "blue", parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+
+        accent, soft, dark = self._COLORS.get(color, self._COLORS["blue"])
+
+        frame = QFrame(self)
+        frame.setStyleSheet(f"""
+            QFrame {{
+                background: {soft};
+                border: 1.5px solid {accent};
+                border-radius: 12px;
+            }}
+        """)
+        eff = QGraphicsDropShadowEffect(frame)
+        eff.setBlurRadius(24)
+        eff.setOffset(0, 6)
+        eff.setColor(QColor(0, 0, 0, 40))
+        frame.setGraphicsEffect(eff)
+
+        row = QHBoxLayout(frame)
+        row.setContentsMargins(16, 12, 16, 12)
+        row.setSpacing(10)
+
+        dot = QFrame()
+        dot.setFixedSize(8, 8)
+        dot.setStyleSheet(f"background:{accent}; border-radius:4px;")
+        row.addWidget(dot, 0, Qt.AlignVCenter)
+
+        lbl = QLabel(message)
+        lbl.setStyleSheet(f"color:{dark}; font-size:13px; font-weight:600; background:transparent; border:none;")
+        row.addWidget(lbl)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(frame)
+
+        self.adjustSize()
+
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.close)
+
+    def show_in(self, parent_widget: QWidget, duration_ms: int = 2500):
+        top_level = parent_widget.window()
+        self.setParent(top_level)
+        self.setWindowFlags(Qt.Widget)
+        self.adjustSize()
+
+        x = top_level.width() - self.width() - 24
+        y = top_level.height() - self.height() - 24
+        self.move(x, y)
+        self.raise_()
+
+        # Fade in using opacity effect
+        self._opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self._opacity_effect)
+
+        self._fade_in = QPropertyAnimation(self._opacity_effect, b"opacity")
+        self._fade_in.setDuration(250)
+        self._fade_in.setStartValue(0.0)
+        self._fade_in.setEndValue(1.0)
+        self._fade_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._fade_out = QPropertyAnimation(self._opacity_effect, b"opacity")
+        self._fade_out.setDuration(300)
+        self._fade_out.setStartValue(1.0)
+        self._fade_out.setEndValue(0.0)
+        self._fade_out.setEasingCurve(QEasingCurve.Type.InCubic)
+        self._fade_out.finished.connect(self.close)
+
+        self.show()
+        self._fade_in.start()
+
+        self._timer.setInterval(duration_ms)
+        self._timer.timeout.connect(self._fade_out.start)
+        self._timer.start()

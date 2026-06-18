@@ -23,7 +23,7 @@ from database.repositories import get_rooms
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar,
-    MiniInsightCard, KPICard, PaginationControl, table_action_cell, filter_button
+    MiniInsightCard, KPICard, PaginationControl, table_action_cell, filter_button, Toast
 )
 
 
@@ -403,6 +403,7 @@ class RoomsPage(QWidget):
             from database.repositories import add_room
             if add_room(rec):
                 self.refresh()
+                Toast("Room created successfully.", "green").show_in(self)
 
     def _edit_room(self, rid: str = None):
         if not isinstance(rid, str):
@@ -421,6 +422,7 @@ class RoomsPage(QWidget):
             if edit_rid is not None:
                 update_room(edit_rid, rec)
             self.refresh()
+            Toast("Room updated successfully.", "blue").show_in(self)
 
     def _delete_room(self, rid: str = None):
         if not isinstance(rid, str):
@@ -443,3 +445,4 @@ class RoomsPage(QWidget):
             if del_rid is not None:
                 delete_room(del_rid)
             self.refresh()
+            Toast("Room deleted.", "red").show_in(self)

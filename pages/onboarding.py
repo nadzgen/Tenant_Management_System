@@ -19,7 +19,7 @@ from theme import T
 from database.repositories import get_rooms
 from widgets.components import (
     Card, section_title, primary_button, ghost_button, 
-    styled_table, set_table_item, set_badge_cell
+    styled_table, set_table_item, set_badge_cell, Toast
 )
 
 
@@ -542,7 +542,8 @@ class OnboardingDialog(QDialog):
         success = onboard_tenant(self.tenant_data, room_id, room_rent, self.payment_data)
         
         if success:
-            QMessageBox.information(self, "Success", f"Tenant '{self.tenant_data['name']}' onboarded successfully!")
+            # QMessageBox.information(self, "Success", f"Tenant '{self.tenant_data['name']}' onboarded successfully!") // -> Replace with toast
+            Toast("Tenant onboarded successfully.", "green").show_in(self.parent() or self)
         else:
             QMessageBox.critical(self, "Error", "Failed to onboard tenant. Please check database logs.")
             return

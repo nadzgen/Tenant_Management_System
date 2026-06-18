@@ -23,7 +23,7 @@ from database.repositories import get_payments
 from widgets.components import (
     Card, section_title, styled_table, set_table_item, set_badge_cell,
     primary_button, ghost_button, danger_button, search_bar, KPICard,
-    PaginationControl, table_action_cell, filter_button, MonthPicker
+    PaginationControl, table_action_cell, filter_button, MonthPicker, Toast
 )
 
 
@@ -487,6 +487,7 @@ class PaymentsPage(QWidget):
             from database.repositories import add_payment
             if add_payment(rec):
                 self.refresh()
+                Toast("Payment recorded successfully.", "green").show_in(self)
 
     def _edit_payment(self, pid: str = None):
         if not isinstance(pid, str):
@@ -505,6 +506,7 @@ class PaymentsPage(QWidget):
             if edit_pid is not None:
                 update_payment(int(edit_pid), rec)
             self.refresh()
+            Toast("Payment updated successfully.", "blue").show_in(self)
 
     def _delete_payment(self, pid: str = None):
         if not isinstance(pid, str):
@@ -527,3 +529,4 @@ class PaymentsPage(QWidget):
             if del_pid is not None:
                 delete_payment(int(del_pid))
             self.refresh()
+            Toast("Payment deleted.", "red").show_in(self)
