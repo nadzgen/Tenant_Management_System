@@ -7,15 +7,16 @@ TODO(DB): Replace ROOMS list operations with SQLite queries.
 """
 
 from __future__ import annotations
+from datetime import date
 
 import copy
 import re
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QActionGroup
+from PySide6.QtGui import QActionGroup, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QDialog, QFormLayout, QLineEdit, QComboBox, QListView, QDialogButtonBox,
-    QMessageBox, QAbstractItemView, QGridLayout, QMenu,
+    QMessageBox, QAbstractItemView, QGridLayout, QMenu, QTableWidgetItem
 )
 
 from theme import T
@@ -196,6 +197,136 @@ class RoomDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# View Rooms page
+# ---------------------------------------------------------------------------
+
+class RoomDetailDialog(QDialog):
+    def __init__(self, record: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Room {record.get('number', '')} — Details")
+        self.setMinimumWidth(520)
+        self.setStyleSheet(f"background:{T.SURFACE};")
+        self._build(record)
+
+    def _build(self, r: dict):
+        from database.repositories import get_tenants
+        from widgets.components import styled_table, set_table_item, set_badge_cell
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(20)
+
+        # Title
+        title = QLabel(f"Room {r.get('number', '')}")
+        title.setStyleSheet(f"color:{T.TEXT}; font-size:18px; font-weight:700;")
+        lay.addWidget(title)
+
+        # Detail grid
+        grid = QGridLayout(); grid.setSpacing(12)
+        details = [
+            ("Room Type",    r.get("type", "—")),
+            ("Monthly Rent", f"₱ {int(r.get('rent', 0)):,}"),
+            ("Capacity",     str(r.get("capacity", "—"))),
+            ("Occupancy",    f"{r.get('occupied_slots', 0)}/{r.get('capacity', 0)}"),
+            ("Status",       r.get("status", "—")),
+            ("Occupant Sex", r.get("occupant_sex", "—")),
+        ]
+        lbl_style  = f"color:{T.TEXT_MUTED}; font-size:12px; font-weight:600;"
+        val_style  = f"color:{T.TEXT}; font-size:13px; font-weight:500;"
+        for i, (label, value) in enumerate(details):
+            col = (i % 2) * 2
+            row = i // 2
+            l = QLabel(label); l.setStyleSheet(lbl_style)
+            v = QLabel(value); v.setStyleSheet(val_style)
+            grid.addWidget(l, row, col)
+            grid.addWidget(v, row, col + 1)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
+        lay.addLayout(grid)
+
+        # Divider
+        div = QLabel(); div.setFixedHeight(1)
+        div.setStyleSheet(f"background:{T.BORDER};")
+        lay.addWidget(div)
+
+        # Tenants table
+        sub = QLabel("Tenants in this Room")
+        sub.setStyleSheet(f"color:{T.TEXT}; font-size:14px; font-weight:700;")
+        lay.addWidget(sub)
+
+        today = date.today().isoformat()
+
+        from PySide6.QtWidgets import QHeaderView
+        room_num = str(r.get("number", ""))
+        all_tenants = [t for t in get_tenants() if str(t.get("room", "")) == room_num]
+        active  = [t for t in all_tenants if not t.get("end_date") or t.get("end_date") >= today]
+        expired = [t for t in all_tenants if t.get("end_date") and t.get("end_date") < today]
+
+        # ── Current Residents ────────────────────────────────────────────────
+        cur_lbl = QLabel("Current Residents")
+        cur_lbl.setStyleSheet(f"color:{T.SUCCESS}; font-size:13px; font-weight:700;")
+        lay.addWidget(cur_lbl)
+
+        tbl1 = styled_table(["ID", "Name", "Since"])
+        tbl1.setFixedHeight(160)
+        tbl1.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        tbl1.setColumnWidth(0, 55)
+        tbl1.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        tbl1.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
+        for t in active:
+            row = tbl1.rowCount(); tbl1.insertRow(row)
+            set_table_item(tbl1, row, 0, t.get("id", ""))
+            set_table_item(tbl1, row, 1, t.get("name", ""))
+            set_table_item(tbl1, row, 2, t.get("start_date", "—"))
+
+        if not active:
+            tbl1.insertRow(0)
+            item = QTableWidgetItem("No active tenants in this room.")
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setForeground(QColor(T.TEXT_MUTED))
+            tbl1.setItem(0, 0, item)
+            tbl1.setSpan(0, 0, 1, 3)
+
+        lay.addWidget(tbl1)
+
+        # ── Past Tenants ─────────────────────────────────────────────────────
+        past_lbl = QLabel("Past Tenants")
+        past_lbl.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:13px; font-weight:700;")
+        lay.addWidget(past_lbl)
+
+        tbl2 = styled_table(["ID", "Name", "Start Date", "End Date"])
+        tbl2.setFixedHeight(160)
+        tbl2.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        tbl2.setColumnWidth(0, 55)
+        tbl2.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        tbl2.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        tbl2.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+
+        for t in expired:
+            row = tbl2.rowCount(); tbl2.insertRow(row)
+            set_table_item(tbl2, row, 0, t.get("id", ""))
+            set_table_item(tbl2, row, 1, t.get("name", ""))
+            set_table_item(tbl2, row, 2, t.get("start_date", "—"))
+            set_table_item(tbl2, row, 3, t.get("end_date", "—"))
+
+        if not expired:
+            tbl2.insertRow(0)
+            item = QTableWidgetItem("No past tenants for this room.")
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setForeground(QColor(T.TEXT_MUTED))
+            tbl2.setItem(0, 0, item)
+            tbl2.setSpan(0, 0, 1, 4)
+
+        lay.addWidget(tbl2)
+
+        # Close button
+        close_btn = primary_button("Close")
+        close_btn.clicked.connect(self.accept)
+        lay.addWidget(close_btn, 0, Qt.AlignRight)
+
+
+# ---------------------------------------------------------------------------
 # Main page
 # ---------------------------------------------------------------------------
 
@@ -286,6 +417,7 @@ class RoomsPage(QWidget):
         
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tbl.doubleClicked.connect(self._view_room)
         card.body.addWidget(self._tbl)
 
         # Pagination and row count
@@ -388,6 +520,12 @@ class RoomsPage(QWidget):
             if str(r.get("id")) == rid:
                 return i
         return None
+
+    def _view_room(self, index):
+        rid = self._tbl.item(index.row(), 0).text()
+        record = next((r for r in self._data if str(r.get("id")) == rid), None)
+        if record:
+            RoomDetailDialog(record, parent=self).exec()
 
     def refresh(self):
         from database.repositories import get_rooms
