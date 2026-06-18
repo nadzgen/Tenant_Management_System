@@ -210,6 +210,12 @@ class OnboardingDialog(QDialog):
         self.room_data = None
         self.payment_data = {}
         self._build()
+
+    def _view_room_detail(self, index):
+        row = index.row()
+        if row < len(self.avail_rooms):
+            from pages.rooms import RoomDetailDialog
+            RoomDetailDialog(self.avail_rooms[row], parent=self).exec()
         
     def refresh(self):
         self._load_rooms()
@@ -302,18 +308,16 @@ class OnboardingDialog(QDialog):
         lay_room = QVBoxLayout()
         lay_room.setSpacing(12)
         
-        self.tbl_rooms = styled_table(["Room ID", "Number", "Type", "Capacity", "Rent", "Status"])
+        self.tbl_rooms = styled_table(["Room No.", "Type", "Occupancy", "Monthly Rent"])
         self.tbl_rooms.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tbl_rooms.setMinimumHeight(260)
+        self.tbl_rooms.doubleClicked.connect(self._view_room_detail)
 
         hh = self.tbl_rooms.horizontalHeader()
-        hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Room ID
-        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Number
-        hh.setSectionResizeMode(2, QHeaderView.Stretch)           # Type stretches
-        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Capacity
-        hh.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Rent
-        hh.setSectionResizeMode(5, QHeaderView.Fixed)             # Status
-        self.tbl_rooms.setColumnWidth(5, 140)
+        hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Room No.
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)           # Type
+        hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Occupancy
+        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Rent
 
         self.tbl_rooms.verticalHeader().setDefaultSectionSize(38)
         self._load_rooms()
@@ -401,12 +405,10 @@ class OnboardingDialog(QDialog):
         self.tbl_rooms.setRowCount(0)
         for r_data in self.avail_rooms:
             row = self.tbl_rooms.rowCount(); self.tbl_rooms.insertRow(row)
-            set_table_item(self.tbl_rooms, row, 0, str(r_data["id"]))
-            set_table_item(self.tbl_rooms, row, 1, str(r_data["number"]))
-            set_table_item(self.tbl_rooms, row, 2, r_data["type"])
-            set_table_item(self.tbl_rooms, row, 3, str(r_data["capacity"]))
-            set_table_item(self.tbl_rooms, row, 4, f"₱ {int(r_data['rent']):,}")
-            set_badge_cell(self.tbl_rooms, row, 5, r_data["status"])
+            set_table_item(self.tbl_rooms, row, 0, str(r_data["number"]))
+            set_table_item(self.tbl_rooms, row, 1, r_data["type"])
+            set_table_item(self.tbl_rooms, row, 2, f"{r_data.get('occupied_slots', 0)}/{r_data['capacity']}")
+            set_table_item(self.tbl_rooms, row, 3, f"₱ {int(r_data['rent']):,}")
 
     def _set_step(self, idx: int):
         self.stack.setCurrentIndex(idx)
