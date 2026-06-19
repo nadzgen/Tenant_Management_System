@@ -41,10 +41,13 @@ Double-click any room row to open a **Room Detail modal** showing:
 - Right-click any current resident to **End Rent** (sets today as end date and frees the slot) or **Transfer to Another Room** (moves the tenant to a selected available room)
 
 ### Onboarding
-A step-by-step modal for adding new tenants — collects personal info, assigns a room, and records the first payment in one flow. Room selection shows room number, type, occupancy, and rent. Double-click a room in the onboarding table to preview its full detail before assigning.
+A step-by-step modal for adding new tenants — collects personal info, assigns a room, and records the initial payment entries in one flow. The onboarding flow can automatically create the deposit and first month rent record, depending on the selected move-in/payment details. Room selection shows room number, type, occupancy, and rent. Double-click a room in the onboarding table to preview its full detail before assigning.
 
 ### Payment Management
-Record payments against a rental with a due date, payment date, amount, and type (Regular, Summer, Deposit, or Advance). Status is categorized automatically as **Paid**, **Unpaid**, or **Overdue**. Full payment history is kept per tenant, and individual records can be edited or deleted as needed.
+Record payments against a rental with a due date, payment date, amount, and type (Regular, Deposit, or Summer). The system now automatically generates monthly rental records for active tenants, updates unpaid items to **Overdue** when the due date passes, and lets you mark a record as paid with one action. Payment status is categorized automatically as **Paid**, **Unpaid**, or **Overdue**. Full payment history is kept per tenant, and individual records can be edited or deleted as needed.
+
+### Payment Automation
+Payment records are kept in sync with the rental timeline. New monthly rent entries are created automatically for active rentals, duplicate monthly records are prevented, and login-time maintenance keeps overdue statuses up to date so the payment list stays current.
 
 ### Search, Filter & Sort
 Search across tenant names, IDs, room numbers, room types, contact numbers, payment status, and due dates. Filter by room availability, occupancy status, room type, or payment status. Sort records by move-in date, due date, monthly rent, capacity, room type, payment status, or tenant name. Tables update in real time after any add, edit, or delete action.
