@@ -537,6 +537,7 @@ class RoomsPage(QWidget):
         self._tbl = styled_table(
             ["Room ID", "Room Number", "Type", "Monthly Rent", "Occupancy", "Occupant Sex", "Status", "Action"]
         )
+        self._tbl.setColumnHidden(0, True) # Hide internal ID column
         self._tbl.horizontalHeader().sortIndicatorChanged.connect(self._on_sort)
         self._sort_col = -1
         self._sort_order = Qt.AscendingOrder

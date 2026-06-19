@@ -221,7 +221,7 @@ class TenantDetailDialog(QDialog):
         sub.setStyleSheet(f"color:{T.TEXT}; font-size:14px; font-weight:700;")
         lay.addWidget(sub)
 
-        tbl = styled_table(["ID", "Amount", "Due Date", "Paid On", "Type", "Status"])
+        tbl = styled_table(["Amount", "Due Date", "Paid On", "Type", "Status"])
         tbl.setFixedHeight(240)
 
         hh = tbl.horizontalHeader()
