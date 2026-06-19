@@ -342,8 +342,8 @@ class RoomDetailDialog(QDialog):
         from PySide6.QtWidgets import QHeaderView
         room_num = str(r.get("number", ""))
         all_tenants = [t for t in get_tenants() if str(t.get("room", "")) == room_num]
-        active  = [t for t in all_tenants if not t.get("end_date") or t.get("end_date") >= today]
-        expired = [t for t in all_tenants if t.get("end_date") and t.get("end_date") < today]
+        active  = [t for t in all_tenants if not t.get("end_date") or t.get("end_date") > today]
+        expired = [t for t in all_tenants if t.get("end_date") and t.get("end_date") <= today]
 
         # ── Current Residents ────────────────────────────────────────────────
         cur_lbl = QLabel("Current Residents")
@@ -444,7 +444,7 @@ class RoomDetailDialog(QDialog):
                 if end_rental(tid):
                     from widgets.components import Toast
                     Toast(f"Rental ended for {name}.", "red").show_in(self.parent() or self)
-                    self.accept()
+                    self.done(2)
 
         elif chosen == transfer_act:
             dlg = TransferDialog(name, str(room.get("number", "")), parent=self)
@@ -452,7 +452,7 @@ class RoomDetailDialog(QDialog):
                 if transfer_tenant(tid, dlg.selected_room_id, dlg.selected_room_rent):
                     from widgets.components import Toast
                     Toast(f"{name} transferred successfully.", "blue").show_in(self.parent() or self)
-                    self.accept()
+                    self.done(2)
 
 
 # ---------------------------------------------------------------------------
@@ -652,9 +652,15 @@ class RoomsPage(QWidget):
 
     def _view_room(self, index):
         rid = self._tbl.item(index.row(), 0).text()
-        record = next((r for r in self._data if str(r.get("id")) == rid), None)
-        if record:
-            RoomDetailDialog(record, parent=self).exec()
+        while True:
+            self.refresh()
+            record = next((r for r in self._data if str(r.get("id")) == rid), None)
+            if not record:
+                break
+            dlg = RoomDetailDialog(record, parent=self)
+            result = dlg.exec()
+            if result != 2:
+                break
 
     def refresh(self):
         from database.repositories import get_rooms

@@ -25,16 +25,28 @@ python main.py
 At-a-glance summary cards for total tenants, available rooms, occupied rooms, and unpaid/overdue payments — plus a recent payment activity feed and occupancy updates.
 
 ### Tenant Management
-Register tenants with name, contact number, birthdate, and sex. Assign them to available rooms during registration. Edit details and room assignments, or remove tenants (room occupancy updates automatically). Tenant history — past assignments and payment records — is preserved for future reference.
+Register tenants with name, contact number, birthdate, and sex. Assign them to available rooms during onboarding. Edit details, or remove tenants (room occupancy updates automatically). Tenant history — past assignments and payment records — is preserved for future reference.
 
 ### Room Management
-Create rooms with a room number, type (Solo, Bedspacer, Solo Deluxe, Bedspacer Deluxe), capacity, monthly rent, and deposit. Occupancy is tracked automatically — rooms are marked **Available**, **Partially Occupied**, or **Full**, and new assignments are blocked once capacity is reached.
+Create rooms with a room number, type (Solo, Bedspacer, Solo Deluxe, Bedspacer Deluxe), capacity, monthly rent, and deposit. Solo and Solo Deluxe rooms are locked to a capacity of 1. Occupancy is tracked automatically — rooms are marked **Vacant**, **Partially Occupied**, or **Full**, and new assignments are blocked once capacity is reached.
+
+Double-click any room row to open a **Room Detail modal** showing:
+- Room info (type, rent, capacity, status, occupancy)
+- **Current Residents** table with tenant name and move-in date
+- **Past Tenants** table with start and end dates
+- Right-click any current resident to **End Rent** (sets today as end date and frees the slot) or **Transfer to Another Room** (moves the tenant to a selected available room)
+
+### Onboarding
+A step-by-step modal for adding new tenants — collects personal info, assigns a room, and records the first payment in one flow. Room selection shows room number, type, occupancy, and rent. Double-click a room in the onboarding table to preview its full detail before assigning.
 
 ### Payment Management
 Record payments against a rental with a due date, payment date, amount, and type (Regular, Summer, Deposit, or Advance). Status is categorized automatically as **Paid**, **Unpaid**, or **Overdue**. Full payment history is kept per tenant, and individual records can be edited or deleted as needed.
 
 ### Search, Filter & Sort
 Search across tenant names, IDs, room numbers, room types, contact numbers, payment status, and due dates. Filter by room availability, occupancy status, room type, or payment status. Sort records by move-in date, due date, monthly rent, capacity, room type, payment status, or tenant name. Tables update in real time after any add, edit, or delete action.
+
+### Toast Notifications
+All create, edit, and delete actions show a brief fade-in/fade-out toast notification anchored to the bottom-right of the app window — green for create, blue for edit, red for delete.
 
 ---
 
