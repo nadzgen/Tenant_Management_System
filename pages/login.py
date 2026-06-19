@@ -153,7 +153,8 @@ class LoginPage(QWidget):
         user_wrap.setStyleSheet(self._wrap_style())
         ul = QHBoxLayout(user_wrap); ul.setContentsMargins(14, 0, 14, 0); ul.setSpacing(8)
         ul.addWidget(IconLabel("user", T.TEXT_SUBTLE, 18))
-        self.username_input = QLineEdit()
+        # self.username_input = QLineEdit()
+        self.username_input = QLineEdit("admin")  # Pre-fill for testing
         self.username_input.setPlaceholderText("Enter your username")
         self.username_input.setFixedHeight(48)
         self.username_input.setStyleSheet(self._input_style())
@@ -166,7 +167,8 @@ class LoginPage(QWidget):
         pw_wrap.setStyleSheet(self._wrap_style())
         pw_lay = QHBoxLayout(pw_wrap); pw_lay.setContentsMargins(14, 0, 10, 0); pw_lay.setSpacing(8)
         pw_lay.addWidget(IconLabel("lock", T.TEXT_SUBTLE, 18))
-        self.password_input = QLineEdit()
+        # self.password_input = QLineEdit()
+        self.password_input = QLineEdit("admin")  # Pre-fill for testing
         self.password_input.setPlaceholderText("Enter your password")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setFixedHeight(48)

@@ -197,6 +197,89 @@ class RoomDialog(QDialog):
 
 
 # ---------------------------------------------------------------------------
+# Transfer Rooms
+# ---------------------------------------------------------------------------
+
+class TransferDialog(QDialog):
+    def __init__(self, tenant_name: str, current_room: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Transfer Tenant")
+        self.setMinimumWidth(380)
+        self.setStyleSheet(f"background:{T.SURFACE};")
+        self.selected_room_id = None
+        self._build(tenant_name, current_room)
+
+    def _build(self, tenant_name: str, current_room: str):
+        from database.repositories import get_rooms
+        from PySide6.QtWidgets import QHeaderView
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 24, 24, 20)
+        lay.setSpacing(16)
+
+        title = QLabel(f"Transfer — {tenant_name}")
+        title.setStyleSheet(f"color:{T.TEXT}; font-size:16px; font-weight:700;")
+        lay.addWidget(title)
+
+        sub = QLabel(f"Select a new room to move this tenant from Room {current_room}:")
+        sub.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:12.5px;")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
+
+        self._rooms = [
+            r for r in get_rooms()
+            if r["status"] in ("Vacant", "Partially Occupied")
+            and str(r.get("number", "")) != current_room
+        ]
+
+        tbl = styled_table(["Room No.", "Type", "Occupancy", "Rent"])
+        tbl.setFixedHeight(200)
+        tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        tbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        tbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        tbl.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+
+        for r in self._rooms:
+            row = tbl.rowCount(); tbl.insertRow(row)
+            set_table_item(tbl, row, 0, str(r["number"]))
+            set_table_item(tbl, row, 1, r["type"])
+            set_table_item(tbl, row, 2, f"{r.get('occupied_slots',0)}/{r['capacity']}")
+            set_table_item(tbl, row, 3, f"₱ {int(r['rent']):,}")
+
+        tbl.selectionModel().selectionChanged.connect(
+            lambda: self._on_select(tbl)
+        )
+        lay.addWidget(tbl)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.button(QDialogButtonBox.Ok).setText("Transfer")
+        btns.button(QDialogButtonBox.Ok).setEnabled(False)
+        btns.button(QDialogButtonBox.Ok).setStyleSheet(
+            f"QPushButton {{ background:{T.PRIMARY}; color:white; border:none;"
+            f" border-radius:10px; padding:8px 22px; font-size:13px; font-weight:600; }}"
+            f"QPushButton:hover {{ background:{T.PRIMARY_DK}; }}"
+        )
+        btns.button(QDialogButtonBox.Cancel).setStyleSheet(
+            f"QPushButton {{ background:{T.BG}; color:{T.TEXT_MUTED}; border:1px solid {T.BORDER};"
+            f" border-radius:10px; padding:8px 20px; font-size:13px; }}"
+        )
+        self._ok_btn = btns.button(QDialogButtonBox.Ok)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        lay.addWidget(btns)
+
+    def _on_select(self, tbl):
+        rows = tbl.selectionModel().selectedRows()
+        if rows:
+            idx = rows[0].row()
+            self.selected_room_id = self._rooms[idx].get("id")
+            self.selected_room_rent = self._rooms[idx].get("rent", 0)
+            self._ok_btn.setEnabled(True)
+        else:
+            self._ok_btn.setEnabled(False)
+
+
+# ---------------------------------------------------------------------------
 # View Rooms page
 # ---------------------------------------------------------------------------
 
@@ -274,6 +357,11 @@ class RoomDetailDialog(QDialog):
         tbl1.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         tbl1.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
+        tbl1.setContextMenuPolicy(Qt.CustomContextMenu)
+        tbl1.customContextMenuRequested.connect(
+            lambda pos: self._tenant_context_menu(pos, tbl1, active, r)
+        )
+
         for t in active:
             row = tbl1.rowCount(); tbl1.insertRow(row)
             set_table_item(tbl1, row, 0, t.get("id", ""))
@@ -324,6 +412,47 @@ class RoomDetailDialog(QDialog):
         close_btn = primary_button("Close")
         close_btn.clicked.connect(self.accept)
         lay.addWidget(close_btn, 0, Qt.AlignRight)
+
+    def _tenant_context_menu(self, pos, tbl, tenants, room):
+        from database.repositories import end_rental, transfer_tenant
+        idx = tbl.rowAt(pos.y())
+        if idx < 0 or idx >= len(tenants):
+            return
+        tenant = tenants[idx]
+        tid = int(tenant.get("id", 0))
+        name = tenant.get("name", "")
+
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background:{T.SURFACE}; border:1px solid {T.BORDER};
+                     border-radius:8px; padding:4px; }}
+            QMenu::item {{ padding:8px 20px; border-radius:4px; color:{T.TEXT}; font-size:13px; }}
+            QMenu::item:selected {{ background:{T.BG}; color:{T.PRIMARY}; }}
+        """)
+
+        end_act      = menu.addAction("End Rent")
+        transfer_act = menu.addAction("Transfer to Another Room")
+        chosen = menu.exec(tbl.viewport().mapToGlobal(pos))
+
+        if chosen == end_act:
+            ans = QMessageBox.question(
+                self, "End Rent",
+                f"End rental for '{name}'? Today will be set as their end date.",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if ans == QMessageBox.Yes:
+                if end_rental(tid):
+                    from widgets.components import Toast
+                    Toast(f"Rental ended for {name}.", "red").show_in(self.parent() or self)
+                    self.accept()
+
+        elif chosen == transfer_act:
+            dlg = TransferDialog(name, str(room.get("number", "")), parent=self)
+            if dlg.exec() == QDialog.Accepted and dlg.selected_room_id:
+                if transfer_tenant(tid, dlg.selected_room_id, dlg.selected_room_rent):
+                    from widgets.components import Toast
+                    Toast(f"{name} transferred successfully.", "blue").show_in(self.parent() or self)
+                    self.accept()
 
 
 # ---------------------------------------------------------------------------

@@ -597,3 +597,62 @@ def delete_payment(payment_id: int):
             conn.commit()
     except sqlite3.OperationalError as e:
         print(f"Warning (delete_payment): {e}")
+
+
+def end_rental(tenant_id: int) -> bool:
+    """Sets today as the end_date on the tenant's active rental and decrements room slot."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT RentalID, room_id FROM Rental
+                WHERE tenant_id = ? AND (end_date IS NULL OR end_date >= date('now'))
+                ORDER BY start_date DESC LIMIT 1
+            """, (tenant_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            cursor.execute("""
+                UPDATE Rental SET end_date = date('now') WHERE RentalID = ?
+            """, (row["RentalID"],))
+            cursor.execute("""
+                UPDATE Room SET occupied_slots = max(0, occupied_slots - 1) WHERE RoomID = ?
+            """, (row["room_id"],))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Warning (end_rental): {e}")
+        return False
+
+def transfer_tenant(tenant_id: int, new_room_id: int, new_rent: float) -> bool:
+    """Ends the active rental and creates a new one in the target room."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # End current rental
+            cursor.execute("""
+                SELECT RentalID, room_id FROM Rental
+                WHERE tenant_id = ? AND (end_date IS NULL OR end_date >= date('now'))
+                ORDER BY start_date DESC LIMIT 1
+            """, (tenant_id,))
+            row = cursor.fetchone()
+            if row:
+                cursor.execute("""
+                    UPDATE Rental SET end_date = date('now') WHERE RentalID = ?
+                """, (row["RentalID"],))
+                cursor.execute("""
+                    UPDATE Room SET occupied_slots = max(0, occupied_slots - 1) WHERE RoomID = ?
+                """, (row["room_id"],))
+            # Start new rental
+            cursor.execute("""
+                INSERT INTO Rental (tenant_id, room_id, start_date)
+                VALUES (?, ?, date('now'))
+            """, (tenant_id, new_room_id))
+            cursor.execute("""
+                UPDATE Room SET occupied_slots = occupied_slots + 1 WHERE RoomID = ?
+            """, (new_room_id,))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Warning (transfer_tenant): {e}")
+        return False
