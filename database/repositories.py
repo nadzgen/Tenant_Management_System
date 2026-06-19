@@ -168,7 +168,7 @@ def get_payments(month: str = None) -> List[Dict[str, Any]]:
     """
     params = []
     if month:
-        query += " WHERE strftime('%Y-%m', p.due_date) = ? OR p.status = 'Overdue'"
+        query += " WHERE strftime('%Y-%m', p.due_date) = ?"
         params.append(month)
         
     try:
@@ -540,29 +540,30 @@ def add_payment(record: dict) -> int:
                 due_date = record.get("due")
                 month = due_date[:7] if due_date else ""
                 
-                # Check for existing unpaid/overdue payment for this month and rental
+                # Check for any existing payment for this month and rental
                 cursor.execute("""
-                    SELECT PaymentID FROM Payment 
-                    WHERE rental_id=? AND status IN ('Unpaid', 'Overdue') 
+                    SELECT PaymentID, status FROM Payment 
+                    WHERE rental_id=?
                       AND strftime('%Y-%m', due_date) = ?
+                      AND payment_type = 'Regular'
                 """, (rental_id, month))
                 existing = cursor.fetchone()
-                
+
                 if existing:
-                    # Update the existing unpaid record
+                    # Always update existing record — replaces unpaid/overdue/advance
                     cursor.execute("""
                         UPDATE Payment
                         SET amount=?, due_date=?, payment_date=?, status=?, payment_type='Regular'
                         WHERE PaymentID=?
                     """, (record.get("amount"), due_date, record.get("paid_on") or None, record.get("status"), existing[0]))
                     conn.commit()
-                    return existing[0]
+                    return existing["PaymentID"]
                 else:
-                    # Insert new record if none exists
+                    # Insert new record
                     cursor.execute("""
                         INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
                         VALUES (?, ?, ?, ?, ?, 'Regular')
-                    """, (rental_id, record.get("amount"), due_date, record.get("paid_on") if record.get("paid_on") else None, record.get("status")))
+                    """, (rental_id, record.get("amount"), due_date, record.get("paid_on") or None, record.get("status")))
                     conn.commit()
                     return cursor.lastrowid
             return 0
@@ -698,7 +699,12 @@ def generate_monthly_payments():
                 if m > 12:
                     m = 1
                     y += 1
-                while (y, m) <= (today.year, today.month):
+                next_m = today.month + 1
+                next_y = today.year
+                if next_m > 12:
+                    next_m = 1
+                    next_y += 1
+                while (y, m) <= (next_y, next_m):
                     import calendar
                     last_day = calendar.monthrange(y, m)[1]
                     day = min(start.day, last_day)
@@ -714,6 +720,9 @@ def generate_monthly_payments():
                     """, (rental_id, month_key))
                     if not cursor.fetchone():
                         status = "Overdue" if due < today else "Unpaid"
+                        # Next month's payment is always Unpaid not Overdue
+                        if (y, m) == (next_y, next_m):
+                            status = "Unpaid"
                         cursor.execute("""
                             INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
                             VALUES (?, ?, ?, NULL, ?, 'Regular')

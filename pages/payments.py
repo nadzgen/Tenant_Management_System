@@ -38,6 +38,7 @@ class PaymentDialog(QDialog):
         self.setMinimumWidth(420)
         self.setStyleSheet(f"background:{T.SURFACE};")
         self.record = copy.deepcopy(record) if record else {}
+        self._current_rent = 0
         self._build()
 
     def _build(self):
@@ -57,6 +58,7 @@ class PaymentDialog(QDialog):
         
         # Suggestion banner (hidden by default)
         self.suggestion_banner = QLabel()
+        self.suggestion_banner.setWordWrap(True)
         self.suggestion_banner.setStyleSheet(f"""
             background: {T.PRIMARY_SOFT}; 
             color: {T.PRIMARY_DK}; 
@@ -141,12 +143,32 @@ class PaymentDialog(QDialog):
         form.addRow(lbl_tenant, self.tenant_f)
 
         lbl3 = QLabel("Amount (₱)"); lbl3.setStyleSheet(lbl_style)
-        self.amount_f = field("e.g. 5000", self.record.get("amount",""))
+        self.amount_f = QLineEdit(str(self.record.get("amount", "")))
+        self.amount_f.setPlaceholderText("Auto-filled from room rent")
+        self.amount_f.setFixedHeight(42)
+        self.amount_f.setStyleSheet(
+            f"QLineEdit {{ background:{T.BG}; border:1.5px solid {T.BORDER};"
+            f" border-radius:10px; padding:0 14px; color:{T.TEXT}; font-size:13px; }}"
+            f"QLineEdit:focus {{ border:1.5px solid {T.PRIMARY}; }}"
+        )
         form.addRow(lbl3, self.amount_f)
 
-        lbl4 = QLabel("Due Date"); lbl4.setStyleSheet(lbl_style)
-        self.due_f = date_edit(self.record.get("due",""))
-        form.addRow(lbl4, self.due_f)
+        lbl4 = QLabel("Select Month"); lbl4.setStyleSheet(lbl_style)
+        self.month_f = QComboBox(); self.month_f.setView(QListView())
+        self.month_f.setFixedHeight(42)
+        self.month_f.setStyleSheet(f"""
+            QComboBox {{
+                background: {T.BG}; border: 1.5px solid {T.BORDER};
+                border-radius: 10px; padding: 0 14px;
+                color: {T.TEXT}; font-size: 13px;
+            }}
+            QComboBox::drop-down {{ border:none; }}
+            QComboBox::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px; height: 16px;
+            }}
+        """)
+        form.addRow(lbl4, self.month_f)
 
         lbl_type = QLabel("Payment Type"); lbl_type.setStyleSheet(lbl_style)
         self.type_f = QComboBox(); self.type_f.setView(QListView())
@@ -177,35 +199,6 @@ class PaymentDialog(QDialog):
         """)
         form.addRow(lbl_type, self.type_f)
 
-        lbl6 = QLabel("Status"); lbl6.setStyleSheet(lbl_style)
-        self.status_f = QComboBox(); self.status_f.setView(QListView())
-        self.status_f.addItems(["Paid","Unpaid","Overdue"])
-        idx = self.status_f.findText(self.record.get("status","Unpaid"))
-        if idx >= 0: self.status_f.setCurrentIndex(idx)
-        self.status_f.setFixedHeight(42)
-        self.status_f.setStyleSheet(f"""
-            QComboBox {{
-                background: {T.BG};
-                border: 1.5px solid {T.BORDER};
-                border-radius: 10px;
-                padding: 0 14px;
-                color: {T.TEXT};
-                font-size: 13px;
-            }}
-            QComboBox::drop-down {{
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 32px;
-                border: none;
-            }}
-            QComboBox::down-arrow {{
-                image: url(assets/chevron-down.svg);
-                width: 16px;
-                height: 16px;
-            }}
-        """)
-        form.addRow(lbl6, self.status_f)
-
         lay.addLayout(form)
         lay.addSpacing(10)
 
@@ -224,43 +217,143 @@ class PaymentDialog(QDialog):
         btns.rejected.connect(self.reject)
         lay.addWidget(btns)
 
+        # If editing existing record, pre-populate fields
+        if self.record.get("tenant_id"):
+            self._on_tenant_changed()
+            # Pre-select the month matching the existing due date
+            due = self.record.get("due", "")
+            if due:
+                month_key = due[:7]
+                idx = self.month_f.findData(month_key)
+                if idx >= 0:
+                    self.month_f.setCurrentIndex(idx)
+                else:
+                    # Month already paid, add it manually for editing
+                    self.month_f.insertItem(0, month_key, month_key)
+                    self.month_f.setCurrentIndex(0)
+            if self.record.get("amount"):
+                self.amount_f.setText(str(self.record["amount"]))
+
     def _on_tenant_changed(self):
         tid = self.tenant_f.currentData()
-        if not tid: return
-        from database.repositories import get_unpaid_payments_for_tenant, get_tenant_rent
-        
-        # Auto-fill rent amount if not editing
-        if not self.record.get("amount"):
-            rent = get_tenant_rent(int(tid))
-            if rent > 0:
-                self.amount_f.setText(str(int(rent)))
+        if not tid:
+            return
+        from database.repositories import get_tenant_rent, get_payments
+        from datetime import date, timedelta
+        import calendar
 
-        unpaid = get_unpaid_payments_for_tenant(tid)
-        if unpaid:
-            rec = unpaid[0]
-            self.suggestion_banner.setText(f"💡 Found an Unpaid record for {rec['due'][:7]}. Auto-filled details.")
-            self.suggestion_banner.show()
-            self.amount_f.setText(str(int(rec["amount"])))
-            self.due_f.setDate(QDate.fromString(rec["due"], "yyyy-MM-dd"))
-            self.status_f.setCurrentText("Paid")
+        # Show rent amount
+        rent = get_tenant_rent(int(tid))
+        self._current_rent = int(rent) if rent > 0 else 0
+        if self._current_rent:
+            self.amount_f.setText(str(self._current_rent))
         else:
+            self.amount_f.clear()
+
+        # Build list of unpaid months — from rental start+1 up to next month
+        all_payments = get_payments()
+        paid_months = set(
+            p["due"][:7] for p in all_payments
+            if str(p.get("tenant_id", "")) == str(tid)
+            and p["status"] == "Paid"
+        )
+
+        # Get rental start date
+        from database.repositories import get_tenants
+        tenant = next((t for t in get_tenants() if str(t.get("id")) == str(tid)), None)
+        start_str = tenant.get("start_date", "") if tenant else ""
+
+        today = date.today()
+        # Go up to next month
+        next_month = today.replace(day=1)
+        if today.month == 12:
+            next_month = next_month.replace(year=today.year + 1, month=1)
+        else:
+            next_month = next_month.replace(month=today.month + 1)
+
+        unpaid_months = []
+        if start_str:
+            start = date.fromisoformat(start_str)
+            m, y = start.month + 1, start.year
+            if m > 12:
+                m, y = 1, y + 1
+            while (y, m) <= (next_month.year, next_month.month):
+                key = f"{y}-{m:02d}"
+                if key not in paid_months:
+                    unpaid_months.append(key)
+                m += 1
+                if m > 12:
+                    m, y = 1, y + 1
+
+        # Advance: 2 more months beyond next month
+        advance_months = []
+        if start_str:
+            am, ay = next_month.month + 1, next_month.year
+            if am > 12:
+                am, ay = 1, ay + 1
+            for _ in range(2):
+                key = f"{ay}-{am:02d}"
+                if key not in paid_months:
+                    advance_months.append(key)
+                am += 1
+                if am > 12:
+                    am, ay = 1, ay + 1
+
+        self.month_f.clear()
+        if unpaid_months or advance_months:
+            for key in unpaid_months:
+                self.month_f.addItem(key, key)
+            for key in advance_months:
+                self.month_f.addItem(f"{key} (Advance)", key)
+            count = len(unpaid_months)
+            self.suggestion_banner.setText(
+                f"{count} unpaid month(s) found. Advance months also available."
+                if count else "All caught up! Select an advance month to pay ahead."
+            )
+            self.suggestion_banner.show()
+        else:
+            self.month_f.addItem("No months available", "")
             self.suggestion_banner.hide()
 
     def _on_accept(self):
         tid = self.tenant_f.currentData()
-        self.record["tenant_id"]     = str(tid) if tid is not None else ""
-        self.record["tenant"]        = self.tenant_f.currentText().split(" (T-")[0] if self.tenant_f.currentText() else ""
-        self.record["amount"]        = self.amount_f.text().strip()
-        self.record["due"]           = self.due_f.date().toString("yyyy-MM-dd")
-        self.record["type"]          = self.type_f.currentText()
-        self.record["status"]        = self.status_f.currentText()
-        self.record["paid_on"] = (
+        if not tid:
+            QMessageBox.warning(self, "Validation", "Please select a tenant.")
+            return
+
+        month_str = self.month_f.currentData() or self.month_f.currentText()
+        if not month_str or month_str in ("All months paid", "No months available", ""):
+            QMessageBox.warning(self, "Validation", "No unpaid month to record.")
+            return
+
+        if not getattr(self, "_current_rent", 0):
+            QMessageBox.warning(self, "Validation", "Tenant has no active room rent.")
+            return
+
+        # Build due date from selected month + tenant start day
+        from database.repositories import get_tenants
+        from datetime import date
+        import calendar
+        tenant = next((t for t in get_tenants() if str(t.get("id")) == str(tid)), None)
+        start_str = tenant.get("start_date", "") if tenant else ""
+        try:
+            start_day = date.fromisoformat(start_str).day if start_str else 1
+        except:
+            start_day = 1
+        y, m = int(month_str[:4]), int(month_str[5:7])
+        last_day = calendar.monthrange(y, m)[1]
+        due_date = date(y, m, min(start_day, last_day)).isoformat()
+
+        self.record["tenant_id"] = str(tid)
+        self.record["tenant"]    = self.tenant_f.currentText().split(" (T-")[0]
+        self.record["amount"]    = self.amount_f.text().strip() or str(self._current_rent)
+        self.record["due"]       = due_date
+        self.record["type"]      = self.type_f.currentText()
+        self.record["status"]    = "Paid"
+        self.record["paid_on"]   = (
             QDate.currentDate().toString("yyyy-MM-dd")
             if self.record["status"] == "Paid" else ""
         )
-        if not self.record["tenant_id"]:
-            QMessageBox.warning(self, "Validation", "Please select a tenant.")
-            return
         self.accept()
 
 
@@ -385,9 +478,11 @@ class PaymentsPage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         
+        from database.repositories import get_payments
+        all_payments = get_payments()
         paid_amt    = sum(p["amount"] for p in self._data if p["status"] == "Paid")
         unpaid_amt  = sum(p["amount"] for p in self._data if p["status"] == "Unpaid")
-        overdue_amt = sum(p["amount"] for p in self._data if p["status"] == "Overdue")
+        overdue_amt = sum(p["amount"] for p in all_payments if p["status"] == "Overdue")
         self.kpi_row.addWidget(KPICard("Total Collected",  f"₱ {int(paid_amt):,}",    "wallet", T.SUCCESS, T.SUCCESS_SOFT, "", True,  "Paid this month"))
         self.kpi_row.addWidget(KPICard("Pending Amount",   f"₱ {int(unpaid_amt):,}",  "wallet", T.WARNING, T.WARNING_SOFT, "", False, "Not yet paid this month"))
         self.kpi_row.addWidget(KPICard("Overdue Amount",   f"₱ {int(overdue_amt):,}", "wallet", T.DANGER,  T.DANGER_SOFT,  "", False, "Total past due"))
