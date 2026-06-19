@@ -232,7 +232,7 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
             row = cursor.fetchone()
             if row: stats["total_rooms"] = row[0]
             
-            cursor.execute("SELECT COUNT(*) FROM Room WHERE occupied_slots = 0")
+            cursor.execute("SELECT COUNT(*) FROM Room WHERE occupied_slots < capacity")
             row = cursor.fetchone()
             if row: stats["vacant_units"] = row[0]
             

@@ -92,8 +92,8 @@ class DashboardPage(QWidget):
         kpis = QHBoxLayout(); kpis.setSpacing(20)
         kpis.addWidget(KPICard("Monthly Revenue",  f"₱ {int(total_revenue):,}", "wallet",
                                T.PRIMARY, T.PRIMARY_SOFT, "", True, "Collected this month"))
-        kpis.addWidget(KPICard("Vacant Units", str(vacant_units), "door",
-                               T.WARNING, T.WARNING_SOFT, "0", True, "Available for rent"))
+        kpis.addWidget(KPICard("Available Units", str(vacant_units), "door",
+                               T.WARNING, T.WARNING_SOFT, "0", True, "Vacant or partially occupied"))
         kpis.addWidget(KPICard("Active Tenants", str(active_tenants), "users",
                                T.PURPLE, T.PURPLE_SOFT, "1", True, "Currently housed"))
         root.addLayout(kpis)

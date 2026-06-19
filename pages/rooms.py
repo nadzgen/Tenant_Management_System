@@ -616,9 +616,12 @@ class RoomsPage(QWidget):
             def sort_key(x):
                 val = x.get(k, "")
                 if k in ("occupied_slots", "rent"):
-                    try: return float(val)
-                    except: return 0.0
-                return str(val).lower()
+                    try: return (0, float(val))
+                    except: return (1, 0.0)
+                if k == "id":
+                    try: return (0, int(val))
+                    except: return (1, str(val).lower())
+                return (1, str(val).lower())
             filtered.sort(key=sort_key, reverse=rev)
 
         if reset_page:

@@ -289,7 +289,13 @@ class TenantsPage(QWidget):
             keys = ["id", "name", "contact", "birthdate", "sex", "room", "start_date", "end_date"]
             k = keys[self._sort_col]
             rev = (self._sort_order == Qt.DescendingOrder)
-            filtered.sort(key=lambda x: str(x.get(k, "")).lower(), reverse=rev)
+            def sort_key(x):
+                val = x.get(k, "")
+                if k == "id":
+                    try: return (0, int(val))
+                    except: return (1, str(val).lower())
+                return (1, str(val).lower())
+            filtered.sort(key=sort_key, reverse=rev)
 
         if reset_page:
             self._pagination.current_page = 1

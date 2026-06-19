@@ -202,7 +202,7 @@ class ReportsPage(QWidget):
         mini = [
             ("Average Rent per Unit",         f"₱ {avg_rent:,}",        "wallet", T.PRIMARY, T.PRIMARY_SOFT),
             ("Collection Rate",               collection_rate,   "chart",  T.SUCCESS, T.SUCCESS_SOFT),
-            ("Vacant Units",                  str(vacant_units), "door",   T.WARNING, T.WARNING_SOFT),
+            ("Available Units",               str(vacant_units), "door",   T.WARNING, T.WARNING_SOFT),
             ("Projected Unpaid",              f"₱ {proj_rev:,}",        "users",  T.PURPLE,  T.PURPLE_SOFT),
         ]
         for i, args in enumerate(mini):
