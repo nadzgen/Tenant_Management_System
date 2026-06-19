@@ -159,6 +159,108 @@ class TenantDialog(QDialog):
         self.accept()
 
 
+
+# ---------------------------------------------------------------------------
+# View page
+# ---------------------------------------------------------------------------
+
+class TenantDetailDialog(QDialog):
+    def __init__(self, record: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Tenant — {record.get('name', '')}")
+        self.setMinimumWidth(540)
+        self.setStyleSheet(f"background:{T.SURFACE};")
+        self._build(record)
+
+    def _build(self, t: dict):
+        from database.repositories import get_payments
+        from widgets.components import styled_table, set_table_item, set_badge_cell
+        from PySide6.QtWidgets import QGridLayout, QHeaderView
+        from PySide6.QtGui import QColor
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(20)
+
+        # Title
+        title = QLabel(t.get("name", ""))
+        title.setStyleSheet(f"color:{T.TEXT}; font-size:18px; font-weight:700;")
+        lay.addWidget(title)
+
+        # Detail grid
+        grid = QGridLayout(); grid.setSpacing(12)
+        details = [
+            ("Tenant ID",    str(t.get("id", "—"))),
+            ("Contact",      t.get("contact", "—")),
+            ("Birthdate",    t.get("birthdate", "—")),
+            ("Sex",          t.get("sex", "—")),
+            ("Room",         str(t.get("room", "—"))),
+            ("Start Date",   t.get("start_date", "—")),
+            ("End Date",     t.get("end_date", "—") or "Active"),
+        ]
+        lbl_style = f"color:{T.TEXT_MUTED}; font-size:12px; font-weight:600;"
+        val_style = f"color:{T.TEXT}; font-size:13px; font-weight:500;"
+        for i, (label, value) in enumerate(details):
+            col = (i % 2) * 2
+            row = i // 2
+            l = QLabel(label); l.setStyleSheet(lbl_style)
+            v = QLabel(value); v.setStyleSheet(val_style)
+            grid.addWidget(l, row, col)
+            grid.addWidget(v, row, col + 1)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
+        lay.addLayout(grid)
+
+        # Divider
+        div = QLabel(); div.setFixedHeight(1)
+        div.setStyleSheet(f"background:{T.BORDER};")
+        lay.addWidget(div)
+
+        # Payment history
+        sub = QLabel("Payment History")
+        sub.setStyleSheet(f"color:{T.TEXT}; font-size:14px; font-weight:700;")
+        lay.addWidget(sub)
+
+        tbl = styled_table(["ID", "Amount", "Due Date", "Paid On", "Type", "Status"])
+        tbl.setFixedHeight(240)
+
+        hh = tbl.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(4, QHeaderView.Fixed)
+        tbl.setColumnWidth(4, 120)
+
+        tid = str(t.get("id", ""))
+        payments = [p for p in get_payments() if str(p.get("tenant_id", "")) == tid]
+        payments.sort(key=lambda p: p.get("due", ""), reverse=True)
+
+        for p in payments:
+            r = tbl.rowCount(); tbl.insertRow(r)
+            set_table_item(tbl, r, 0, f"₱ {int(p.get('amount', 0)):,}")
+            set_table_item(tbl, r, 1, p.get("due", ""))
+            set_table_item(tbl, r, 2, p.get("paid_on", "") or "—")
+            set_table_item(tbl, r, 3, p.get("type", ""))
+            set_badge_cell(tbl, r, 4, p.get("status", ""))
+
+        if not payments:
+            tbl.insertRow(0)
+            from PySide6.QtWidgets import QTableWidgetItem
+            item = QTableWidgetItem("No payment records found.")
+            item.setTextAlignment(Qt.AlignCenter)
+            from PySide6.QtGui import QColor
+            item.setForeground(QColor(T.TEXT_MUTED))
+            tbl.setItem(0, 0, item)
+            tbl.setSpan(0, 0, 1, 5)
+
+        lay.addWidget(tbl)
+
+        close_btn = primary_button("Close")
+        close_btn.clicked.connect(self.accept)
+        lay.addWidget(close_btn, 0, Qt.AlignRight)
+
+
 # ---------------------------------------------------------------------------
 # Main page
 # ---------------------------------------------------------------------------
@@ -231,6 +333,7 @@ class TenantsPage(QWidget):
         
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tbl.doubleClicked.connect(self._view_tenant)
         card.body.addWidget(self._tbl)
 
         # Pagination and row count
@@ -384,3 +487,9 @@ class TenantsPage(QWidget):
                 delete_tenant(int(del_tid))
             self.refresh()
             Toast("Tenant deleted.", "red").show_in(self)
+
+    def _view_tenant(self, index):
+        tid = self._tbl.item(index.row(), 0).text()
+        record = next((t for t in self._data if str(t.get("id")) == tid), None)
+        if record:
+            TenantDetailDialog(record, parent=self).exec()
