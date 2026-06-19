@@ -15,7 +15,7 @@ from PySide6.QtGui import QActionGroup
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
     QDialog, QFormLayout, QLineEdit, QComboBox, QListView, QDialogButtonBox,
-    QMessageBox, QAbstractItemView, QDateEdit, QFrame, QMenu, QCompleter
+    QMessageBox, QAbstractItemView, QDateEdit, QFrame, QMenu, QCompleter, QPushButton
 )
 
 from theme import T
@@ -148,10 +148,6 @@ class PaymentDialog(QDialog):
         self.due_f = date_edit(self.record.get("due",""))
         form.addRow(lbl4, self.due_f)
 
-        lbl5 = QLabel("Payment Date"); lbl5.setStyleSheet(lbl_style)
-        self.paid_f = date_edit(self.record.get("paid_on",""))
-        form.addRow(lbl5, self.paid_f)
-
         lbl_type = QLabel("Payment Type"); lbl_type.setStyleSheet(lbl_style)
         self.type_f = QComboBox(); self.type_f.setView(QListView())
         self.type_f.addItems(["Regular", "Deposit", "Summer"])
@@ -231,16 +227,22 @@ class PaymentDialog(QDialog):
     def _on_tenant_changed(self):
         tid = self.tenant_f.currentData()
         if not tid: return
-        from database.repositories import get_unpaid_payments_for_tenant
+        from database.repositories import get_unpaid_payments_for_tenant, get_tenant_rent
+        
+        # Auto-fill rent amount if not editing
+        if not self.record.get("amount"):
+            rent = get_tenant_rent(int(tid))
+            if rent > 0:
+                self.amount_f.setText(str(int(rent)))
+
         unpaid = get_unpaid_payments_for_tenant(tid)
         if unpaid:
-            rec = unpaid[0] # Suggest the oldest unpaid
+            rec = unpaid[0]
             self.suggestion_banner.setText(f"💡 Found an Unpaid record for {rec['due'][:7]}. Auto-filled details.")
             self.suggestion_banner.show()
-            self.amount_f.setText(str(rec["amount"]))
+            self.amount_f.setText(str(int(rec["amount"])))
             self.due_f.setDate(QDate.fromString(rec["due"], "yyyy-MM-dd"))
             self.status_f.setCurrentText("Paid")
-            self.paid_f.setDate(QDate.currentDate())
         else:
             self.suggestion_banner.hide()
 
@@ -250,9 +252,12 @@ class PaymentDialog(QDialog):
         self.record["tenant"]        = self.tenant_f.currentText().split(" (T-")[0] if self.tenant_f.currentText() else ""
         self.record["amount"]        = self.amount_f.text().strip()
         self.record["due"]           = self.due_f.date().toString("yyyy-MM-dd")
-        self.record["paid_on"]       = self.paid_f.date().toString("yyyy-MM-dd")
         self.record["type"]          = self.type_f.currentText()
         self.record["status"]        = self.status_f.currentText()
+        self.record["paid_on"] = (
+            QDate.currentDate().toString("yyyy-MM-dd")
+            if self.record["status"] == "Paid" else ""
+        )
         if not self.record["tenant_id"]:
             QMessageBox.warning(self, "Validation", "Please select a tenant.")
             return
@@ -350,6 +355,8 @@ class PaymentsPage(QWidget):
         
         self._tbl.setMinimumHeight(380)
         self._tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tbl.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._tbl.customContextMenuRequested.connect(self._payment_context_menu)
         card.body.addWidget(self._tbl)
 
         # Pagination and row count
@@ -467,9 +474,16 @@ class PaymentsPage(QWidget):
     def _selected_index(self) -> int | None:
         rows = self._tbl.selectionModel().selectedRows()
         if not rows: return None
-        pid = self._tbl.item(rows[0].row(), 0).text()
-        for i, p in enumerate(self._data):
-            if str(p.get("id")) == pid: return i
+        row = rows[0].row()
+        # Get pid from the action widget since ID column is hidden
+        # Match by position in filtered data instead
+        start_idx = (self._pagination.current_page - 1) * self._pagination.items_per_page
+        data_idx = start_idx + row
+        if 0 <= data_idx < len(self._filtered_data):
+            target_id = self._filtered_data[data_idx].get("id")
+            for i, p in enumerate(self._data):
+                if p.get("id") == target_id:
+                    return i
         return None
 
     def refresh(self):
@@ -477,6 +491,50 @@ class PaymentsPage(QWidget):
         self._data = get_payments(self.current_month)
         self._update_kpis()
         self._apply_filters(reset_page=False)
+
+    def _mark_paid(self, pid: str):
+        from database.repositories import mark_payment_paid
+        if mark_payment_paid(int(pid)):
+            self.refresh()
+            Toast("Payment marked as paid.", "green").show_in(self)
+
+    def _payment_context_menu(self, pos):
+        row = self._tbl.rowAt(pos.y())
+        if row < 0:
+            return
+        start_idx = (self._pagination.current_page - 1) * self._pagination.items_per_page
+        data_idx = start_idx + row
+        if data_idx >= len(self._filtered_data):
+            return
+
+        p = self._filtered_data[data_idx]
+        pid = str(p.get("id", ""))
+        status = p.get("status", "")
+
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{ background:{T.SURFACE}; border:1px solid {T.BORDER};
+                     border-radius:8px; padding:4px; }}
+            QMenu::item {{ padding:8px 20px; border-radius:4px;
+                           color:{T.TEXT}; font-size:13px; }}
+            QMenu::item:selected {{ background:{T.BG}; color:{T.PRIMARY}; }}
+        """)
+
+        if status in ("Unpaid", "Overdue"):
+            mark_paid_act = menu.addAction("✓ Mark as Paid")
+            menu.addSeparator()
+
+        edit_act   = menu.addAction("Edit")
+        delete_act = menu.addAction("Delete")
+
+        chosen = menu.exec(self._tbl.viewport().mapToGlobal(pos))
+
+        if status in ("Unpaid", "Overdue") and chosen == mark_paid_act:
+            self._mark_paid(pid)
+        elif chosen == edit_act:
+            self._edit_payment(pid)
+        elif chosen == delete_act:
+            self._delete_payment(pid)
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 

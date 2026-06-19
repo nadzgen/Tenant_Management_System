@@ -82,7 +82,7 @@ class AppShell(QWidget):
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
         self._pages_cache = {}
-        for i in range(6):
+        for i in range(7):
             self.stack.addWidget(QWidget())
 
         v.addWidget(self.stack, 1)
@@ -205,6 +205,9 @@ class MainWindow(QMainWindow):
 
     def _on_login(self, username: str):
         # TODO(DB): Store session / user ID here
+        from database.repositories import generate_monthly_payments, update_overdue_payments
+        generate_monthly_payments()
+        update_overdue_payments()  # Ensure payments are up-to-date on login
         self._app_shell.set_user(username)
         self._root.setCurrentIndex(1)
 

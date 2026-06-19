@@ -434,20 +434,12 @@ def onboard_tenant(tenant_data: dict, room_id: int, room_rent: float, payment_da
                     VALUES (?, ?, ?, ?, 'Paid', 'Deposit')
                 """, (rental_id, deposit, move_in, move_in))
                 
-            # 5. Insert First Month Rent Payment
-            pay_rent = payment_data.get("pay_rent", False)
-            if pay_rent:
-                rent_paid = payment_data.get("rent", 0)
-                cursor.execute("""
-                    INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
-                    VALUES (?, ?, ?, ?, 'Paid', 'Regular')
-                """, (rental_id, rent_paid, move_in, move_in))
-            else:
-                # Generate an Unpaid invoice for the first month
-                cursor.execute("""
-                    INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
-                    VALUES (?, ?, ?, NULL, 'Unpaid', 'Regular')
-                """, (rental_id, room_rent, move_in))
+            # 5. First month rent is always paid on move-in
+            rent_paid = payment_data.get("rent", room_rent)
+            cursor.execute("""
+                INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
+                VALUES (?, ?, ?, ?, 'Paid', 'Regular')
+            """, (rental_id, rent_paid, move_in, move_in))
             
             conn.commit()
             return True
@@ -656,3 +648,111 @@ def transfer_tenant(tenant_id: int, new_room_id: int, new_rent: float) -> bool:
     except Exception as e:
         print(f"Warning (transfer_tenant): {e}")
         return False
+
+def get_tenant_rent(tenant_id: int) -> float:
+    """Returns the monthly rent of the tenant's currently active room."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT rm.monthly_rent FROM Rental rnt
+                JOIN Room rm ON rnt.room_id = rm.RoomID
+                WHERE rnt.tenant_id = ?
+                  AND (rnt.end_date IS NULL OR rnt.end_date > date('now'))
+                ORDER BY rnt.start_date DESC LIMIT 1
+            """, (tenant_id,))
+            row = cursor.fetchone()
+            return float(row[0]) if row else 0.0
+    except Exception as e:
+        print(f"Warning (get_tenant_rent): {e}")
+        return 0.0
+
+def generate_monthly_payments():
+    """
+    For every active rental, generates an Unpaid payment record for each month
+    from start_date up to the current month if one doesn't already exist.
+    """
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT rnt.RentalID, rnt.tenant_id, rnt.start_date, rnt.end_date,
+                       rm.monthly_rent
+                FROM Rental rnt
+                JOIN Room rm ON rnt.room_id = rm.RoomID
+                WHERE rnt.end_date IS NULL OR rnt.end_date > date('now')
+            """)
+            rentals = cursor.fetchall()
+
+            from datetime import date, timedelta
+            today = date.today()
+
+            for rental in rentals:
+                rental_id   = rental["RentalID"]
+                start       = date.fromisoformat(rental["start_date"])
+                rent        = rental["monthly_rent"]
+
+                # Walk month by month from start+1 month up to today
+                m = start.month + 1
+                y = start.year
+                if m > 12:
+                    m = 1
+                    y += 1
+                while (y, m) <= (today.year, today.month):
+                    import calendar
+                    last_day = calendar.monthrange(y, m)[1]
+                    day = min(start.day, last_day)
+                    due = date(y, m, day)
+                    month_key = f"{y}-{m:02d}"
+
+                    # Check if a payment already exists for this rental+month
+                    cursor.execute("""
+                        SELECT PaymentID FROM Payment
+                        WHERE rental_id = ?
+                          AND strftime('%Y-%m', due_date) = ?
+                          AND payment_type = 'Regular'
+                    """, (rental_id, month_key))
+                    if not cursor.fetchone():
+                        status = "Overdue" if due < today else "Unpaid"
+                        cursor.execute("""
+                            INSERT INTO Payment (rental_id, amount, due_date, payment_date, status, payment_type)
+                            VALUES (?, ?, ?, NULL, ?, 'Regular')
+                        """, (rental_id, rent, due.isoformat(), status))
+
+                    # Advance one month
+                    m += 1
+                    if m > 12:
+                        m = 1
+                        y += 1
+
+            conn.commit()
+    except Exception as e:
+        print(f"Warning (generate_monthly_payments): {e}")
+
+def mark_payment_paid(payment_id: int) -> bool:
+    """Marks a payment as Paid with today as the payment date."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Payment SET status='Paid', payment_date=date('now')
+                WHERE PaymentID=?
+            """, (payment_id,))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Warning (mark_payment_paid): {e}")
+        return False
+
+def update_overdue_payments():
+    """Marks any Unpaid payments past their due date as Overdue."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Payment SET status = 'Overdue'
+                WHERE status = 'Unpaid' AND due_date < date('now')
+            """)
+            conn.commit()
+    except Exception as e:
+        print(f"Warning (update_overdue_payments): {e}")
