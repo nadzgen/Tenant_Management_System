@@ -27,6 +27,10 @@ At-a-glance summary cards for total tenants, available rooms, occupied rooms, an
 ### Tenant Management
 Register tenants with name, contact number, birthdate, and sex. Assign them to available rooms during onboarding. Edit details, or remove tenants (room occupancy updates automatically). Tenant history — past assignments and payment records — is preserved for future reference.
 
+Double-click any tenant row to open a **Tenant Detail modal** showing:
+- Tenant info (id, birthday, number, gender, room, start & end date)
+- **Payment History** table with tenant payments based on date
+
 ### Room Management
 Create rooms with a room number, type (Solo, Bedspacer, Solo Deluxe, Bedspacer Deluxe), capacity, monthly rent, and deposit. Solo and Solo Deluxe rooms are locked to a capacity of 1. Occupancy is tracked automatically — rooms are marked **Vacant**, **Partially Occupied**, or **Full**, and new assignments are blocked once capacity is reached.
 
