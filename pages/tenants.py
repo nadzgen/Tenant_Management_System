@@ -315,6 +315,7 @@ class TenantsPage(QWidget):
         self._add_btn = primary_button("Add Tenant", "plus")
         self._add_btn.clicked.connect(self._add_tenant)
         toolbar.addWidget(self._add_btn)
+        self._add_btn.hide()
 
         card = Card(padding=20)
         card.body.addLayout(toolbar)
@@ -376,8 +377,9 @@ class TenantsPage(QWidget):
             tid = str(t["id"])
             action_widget = table_action_cell(
                 on_edit=lambda checked, tid=tid: self._edit_tenant(tid),
-                on_delete=lambda checked, tid=tid: self._delete_tenant(tid),
-                delete_icon_name="logout"
+                on_delete=lambda checked, tid=tid: self._moveout_tenant(tid),
+                delete_icon_name="logout",
+                delete_tooltip="Move Out"
             )
             self._tbl.setCellWidget(r, 8, action_widget)
         self._count_lbl.setText(f"Showing {len(page_data)} of {len(data)} tenants")
@@ -464,6 +466,31 @@ class TenantsPage(QWidget):
                 update_tenant(int(edit_tid), rec)
             self.refresh()
             Toast("Tenant updated successfully.", "blue").show_in(self)
+
+    def _moveout_tenant(self, tid: str = None):
+        if not isinstance(tid, str):
+            idx = self._selected_index()
+        else:
+            idx = next((i for i, t in enumerate(self._data) if str(t.get("id")) == tid), None)
+
+        if idx is None:
+            return
+
+        name = self._data[idx]["name"]
+        ans = QMessageBox.question(
+            self, "Move Out Tenant",
+            f"Set today as the end date for '{name}'?\nThis will free up their room slot.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if ans == QMessageBox.Yes:
+            from database.repositories import end_rental
+            tid_int = int(self._data[idx].get("id", 0))
+            if end_rental(tid_int):
+                self.refresh()
+                Toast("Tenant moved out successfully.", "red").show_in(self)
+            else:
+                self.refresh()
+                Toast(f"{name} has already moved out.", "blue").show_in(self)
 
     def _delete_tenant(self, tid: str = None):
         if not isinstance(tid, str):
