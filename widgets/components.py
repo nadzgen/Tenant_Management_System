@@ -168,22 +168,22 @@ class KPICard(Card):
     def __init__(self, title: str, value: str, icon: str, color: str,
                  soft: str, delta: str, delta_positive: bool = True,
                  caption: str = "", parent=None):
-        super().__init__(parent, padding=22)
-        self.setMinimumHeight(140)
-        self.setMinimumWidth(240)
+        super().__init__(parent, padding=16)
+        self.setMinimumHeight(110)
+        self.setMinimumWidth(200)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Fixed
         )
 
-        top = QHBoxLayout(); top.setSpacing(14)
-        top.addWidget(SoftIconBadge(icon, color, soft, 52))
+        top = QHBoxLayout(); top.setSpacing(12)
+        top.addWidget(SoftIconBadge(icon, color, soft, 42))
 
-        mid = QVBoxLayout(); mid.setSpacing(6)
+        mid = QVBoxLayout(); mid.setSpacing(4)
         t = QLabel(title.upper())
-        t.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:11px; font-weight:700; letter-spacing:0.8px;")
+        t.setStyleSheet(f"color:{T.TEXT_MUTED}; font-size:10.5px; font-weight:700; letter-spacing:0.6px;")
         v = QLabel(value)
-        v.setStyleSheet(f"color:{T.TEXT}; font-size:26px; font-weight:700;")
+        v.setStyleSheet(f"color:{T.TEXT}; font-size:22px; font-weight:700;")
         mid.addWidget(t); mid.addWidget(v)
         top.addLayout(mid, 1)
         top.addWidget(DeltaPill(delta, delta_positive), 0, Qt.AlignTop)

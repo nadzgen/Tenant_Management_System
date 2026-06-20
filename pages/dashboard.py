@@ -67,7 +67,7 @@ class DashboardPage(QWidget):
         content = QWidget()
         scroll.setWidget(content)
         root = QVBoxLayout(content)
-        root.setContentsMargins(20, 16, 20, 25)
+        root.setContentsMargins(8, 16, 8, 25)
         root.setSpacing(16)
 
         # Load all stats from the database in one call
@@ -88,19 +88,36 @@ class DashboardPage(QWidget):
         proj_rev       = stats.get("projected_revenue", 0)
 
         # ── KPI row ─────────────────────────────────────────────────────────
-        root.addWidget(section_title("Overview", "Today's property snapshot"))
-        kpis = QHBoxLayout(); kpis.setSpacing(20)
+        st1 = section_title("Overview", "Today's property snapshot")
+        st1.layout().setContentsMargins(12, 0, 12, 0)
+        root.addWidget(st1)
+        
+        kpi_container = QFrame()
+        kpi_container.setObjectName("kpiContainer")
+        kpi_container.setStyleSheet(f"#kpiContainer {{ background-color: {T.BG}; border-radius: {T.RADIUS}px; }}")
+        kpis = QHBoxLayout(kpi_container)
+        kpis.setContentsMargins(10, 10, 10, 10)
+        kpis.setSpacing(20)
+        
         kpis.addWidget(KPICard("Monthly Revenue",  f"₱ {int(total_revenue):,}", "wallet",
                                T.PRIMARY, T.PRIMARY_SOFT, "", True, "Collected this month"))
         kpis.addWidget(KPICard("Available Units", str(vacant_units), "door",
                                T.WARNING, T.WARNING_SOFT, "0", True, "Vacant or partially occupied"))
         kpis.addWidget(KPICard("Active Tenants", str(active_tenants), "users",
                                T.PURPLE, T.PURPLE_SOFT, "1", True, "Currently housed"))
-        root.addLayout(kpis)
+        root.addWidget(kpi_container)
 
         # ── Charts row ───────────────────────────────────────────────────────
-        root.addWidget(section_title("Analytics", "Revenue and payment breakdown"))
-        charts = QHBoxLayout(); charts.setSpacing(20)
+        st2 = section_title("Analytics", "Revenue and payment breakdown")
+        st2.layout().setContentsMargins(12, 0, 12, 0)
+        root.addWidget(st2)
+        
+        charts_container = QFrame()
+        charts_container.setObjectName("chartsContainer")
+        charts_container.setStyleSheet(f"#chartsContainer {{ background-color: {T.BG}; border-radius: {T.RADIUS}px; }}")
+        charts = QHBoxLayout(charts_container)
+        charts.setContentsMargins(10, 10, 10, 10)
+        charts.setSpacing(20)
 
         # Revenue trend card
         trend = Card(padding=22)
@@ -184,14 +201,23 @@ class DashboardPage(QWidget):
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
-        root.addLayout(charts)
+        root.addWidget(charts_container)
 
         # ── Insight mini-cards ───────────────────────────────────────────────
         total_p = (paid_count + unpaid_count + overdue_count) or 1
         collection_rate = f"{round(paid_count / total_p * 100)}%"
 
-        root.addWidget(section_title("Additional Insights"))
-        insights = QGridLayout(); insights.setSpacing(20)
+        st3 = section_title("Additional Insights")
+        st3.layout().setContentsMargins(12, 0, 12, 0)
+        root.addWidget(st3)
+        
+        insights_container = QFrame()
+        insights_container.setObjectName("insightsContainer")
+        insights_container.setStyleSheet(f"#insightsContainer {{ background-color: {T.BG}; border-radius: {T.RADIUS}px; }}")
+        insights = QGridLayout(insights_container)
+        insights.setContentsMargins(10, 10, 10, 10)
+        insights.setSpacing(20)
+        
         mini_cards = [
             ("Collection Rate",               collection_rate, "chart",  T.SUCCESS, T.SUCCESS_SOFT),
             ("Average Rent per Unit",         f"₱ {avg_rent:,}", "wallet", T.PRIMARY, T.PRIMARY_SOFT),
@@ -199,11 +225,20 @@ class DashboardPage(QWidget):
         ]
         for i, args in enumerate(mini_cards):
             insights.addWidget(MiniInsightCard(*args), 0, i)
-        root.addLayout(insights)
+        root.addWidget(insights_container)
 
         # ── Recent activity ──────────────────────────────────────────────────
 
-        root.addWidget(section_title("Recent Payments", "Last 10 recorded payments"))
+        st4 = section_title("Recent Payments", "Last 10 recorded payments")
+        st4.layout().setContentsMargins(12, 0, 12, 0)
+        root.addWidget(st4)
+        
+        recent_container = QFrame()
+        recent_container.setObjectName("recentContainer")
+        recent_container.setStyleSheet(f"#recentContainer {{ background-color: {T.BG}; border-radius: {T.RADIUS}px; }}")
+        recent_layout = QVBoxLayout(recent_container)
+        recent_layout.setContentsMargins(10, 10, 10, 10)
+        
         recent = Card(padding=20)
         from widgets.components import styled_table, set_table_item, set_badge_cell
         tbl = styled_table(["Payment ID", "Tenant", "Amount", "Due Date", "Status"])
@@ -218,7 +253,8 @@ class DashboardPage(QWidget):
             set_table_item(tbl, r, 3, row_data["due"])
             set_badge_cell(tbl, r, 4, row_data["status"])
         recent.body.addWidget(tbl)
-        root.addWidget(recent)
+        recent_layout.addWidget(recent)
+        root.addWidget(recent_container)
         root.addStretch(1)
 
     def _on_period_changed(self, text: str):

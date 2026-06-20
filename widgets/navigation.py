@@ -173,13 +173,15 @@ class TopHeader(QFrame):
 
         # Onboard (+) Button
         self.add_btn = QToolButton()
-        self.add_btn.setIcon(make_icon("plus", "white", 20))
-        self.add_btn.setIconSize(QSize(20, 20))
-        self.add_btn.setFixedSize(42, 42)
+        self.add_btn.setIcon(make_icon("plus", T.PRIMARY, 16))
+        self.add_btn.setIconSize(QSize(16, 16))
+        self.add_btn.setText(" Onboard Tenant")
+        self.add_btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.add_btn.setFixedHeight(42)
         self.add_btn.setCursor(Qt.PointingHandCursor)
         self.add_btn.setStyleSheet(
-            f"QToolButton {{ background: {T.PRIMARY}; border-radius: 21px; }}"
-            f"QToolButton:hover {{ background: {T.PRIMARY_DK}; }}"
+            f"QToolButton {{ background: white; color: {T.PRIMARY}; border: 1.5px solid {T.PRIMARY_SOFT}; border-radius: 21px; padding: 0 20px 0 16px; font-weight: 700; font-size: 13px; }}"
+            f"QToolButton:hover {{ background: {T.PRIMARY_SOFT}; border-color: {T.PRIMARY}; }}"
         )
         self.add_btn.clicked.connect(self.onboard_requested.emit)
         row.addWidget(self.add_btn)

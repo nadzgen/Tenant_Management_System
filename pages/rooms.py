@@ -538,6 +538,17 @@ class RoomsPage(QWidget):
             ["Room ID", "Room Number", "Type", "Monthly Rent", "Occupancy", "Occupant Sex", "Status", "Action"]
         )
         self._tbl.setColumnHidden(0, True) # Hide internal ID column
+        
+        from PySide6.QtWidgets import QHeaderView
+        header = self._tbl.horizontalHeader()
+        header.setSectionResizeMode(1, QHeaderView.Interactive); self._tbl.setColumnWidth(1, 130) # Room Number
+        header.setSectionResizeMode(2, QHeaderView.Stretch) # Type
+        header.setSectionResizeMode(3, QHeaderView.Interactive); self._tbl.setColumnWidth(3, 140) # Rent
+        header.setSectionResizeMode(4, QHeaderView.Interactive); self._tbl.setColumnWidth(4, 120) # Occupancy
+        header.setSectionResizeMode(5, QHeaderView.Stretch) # Sex
+        header.setSectionResizeMode(6, QHeaderView.Interactive); self._tbl.setColumnWidth(6, 180) # Status
+        header.setSectionResizeMode(7, QHeaderView.Interactive); self._tbl.setColumnWidth(7, 100) # Action
+
         self._tbl.horizontalHeader().sortIndicatorChanged.connect(self._on_sort)
         self._sort_col = -1
         self._sort_order = Qt.AscendingOrder
