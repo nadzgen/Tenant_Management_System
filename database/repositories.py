@@ -29,6 +29,41 @@ def init_admin_table():
 # Call init_admin_table when module is loaded
 init_admin_table()
 
+def migrate_payment_status():
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # Check current table definition
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='Payment'")
+            row = cursor.fetchone()
+            if row and 'Void' not in row[0]:
+                # Recreate table with Void in CHECK constraint
+                cursor.executescript("""
+                    PRAGMA foreign_keys = OFF;
+                    
+                    CREATE TABLE IF NOT EXISTS Payment_new (
+                        PaymentID INTEGER PRIMARY KEY AUTOINCREMENT,
+                        rental_id INTEGER NOT NULL,
+                        amount REAL NOT NULL,
+                        due_date TEXT NOT NULL,
+                        payment_date TEXT,
+                        status TEXT CHECK(status IN ('Paid','Unpaid','Overdue','Void')) NOT NULL DEFAULT 'Unpaid',
+                        payment_type TEXT CHECK(payment_type IN ('Regular','Deposit','Summer','Advance')),
+                        FOREIGN KEY (rental_id) REFERENCES Rental(RentalID) ON DELETE CASCADE
+                    );
+                    
+                    INSERT INTO Payment_new SELECT * FROM Payment;
+                    DROP TABLE Payment;
+                    ALTER TABLE Payment_new RENAME TO Payment;
+                    
+                    PRAGMA foreign_keys = ON;
+                """)
+                conn.commit()
+    except Exception as e:
+        print(f"Warning (migrate_payment_status): {e}")
+
+migrate_payment_status()
+
 def validate_login(username, password) -> bool:
     try:
         with get_connection() as conn:
@@ -165,7 +200,7 @@ def get_payments(month: str = None) -> List[Dict[str, Any]]:
         FROM Payment p
         JOIN Rental r ON p.rental_id = r.RentalID
         JOIN Tenant t ON r.tenant_id = t.TenantID
-    """
+        """
     params = []
     if month:
         query += " WHERE strftime('%Y-%m', p.due_date) = ?"
@@ -186,7 +221,7 @@ def get_unpaid_payments_for_tenant(tenant_id: int) -> List[Dict[str, Any]]:
         SELECT p.PaymentID as id, p.amount, p.due_date as due, p.status, p.payment_type as type
         FROM Payment p
         JOIN Rental r ON p.rental_id = r.RentalID
-        WHERE r.tenant_id = ? AND p.status IN ('Unpaid', 'Overdue')
+        WHERE r.tenant_id = ? AND p.status IN ('Unpaid', 'Overdue') AND p.status != 'Void'
         ORDER BY p.due_date ASC
     """
     try:
@@ -253,7 +288,7 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
             row = cursor.fetchone()
             if row and row[0]: stats["average_rent"] = int(row[0])
             
-            cursor.execute("SELECT SUM(amount) FROM Payment WHERE status != 'Paid'")
+            cursor.execute("SELECT SUM(amount) FROM Payment WHERE status NOT IN ('Paid', 'Void')")
             row = cursor.fetchone()
             if row and row[0]: stats["projected_revenue"] = int(row[0])
             
@@ -280,7 +315,7 @@ def get_dashboard_stats(month: str = None) -> Dict[str, Any]:
                     stats["overdue_count"] = count
                     
             # Override overdue_count to always reflect global overdue payments
-            cursor.execute("SELECT COUNT(*) FROM Payment WHERE status = 'Overdue'")
+            cursor.execute("SELECT COUNT(*) FROM Payment WHERE status = 'Overdue' AND status != 'Void'")
             row = cursor.fetchone()
             if row: stats["overdue_count"] = row[0]
                     
@@ -586,7 +621,7 @@ def delete_payment(payment_id: int):
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM Payment WHERE PaymentID=?", (payment_id,))
+            cursor.execute("UPDATE Payment SET status='Void' WHERE PaymentID=?", (payment_id,))
             conn.commit()
     except sqlite3.OperationalError as e:
         print(f"Warning (delete_payment): {e}")
@@ -760,7 +795,7 @@ def update_overdue_payments():
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE Payment SET status = 'Overdue'
-                WHERE status = 'Unpaid' AND due_date < date('now')
+                WHERE status = 'Unpaid' AND due_date < date('now') AND status != 'Void'
             """)
             conn.commit()
     except Exception as e:

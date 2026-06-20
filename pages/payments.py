@@ -255,7 +255,7 @@ class PaymentDialog(QDialog):
         paid_months = set(
             p["due"][:7] for p in all_payments
             if str(p.get("tenant_id", "")) == str(tid)
-            and p["status"] == "Paid"
+            and p["status"] in ("Paid", "Void")
         )
 
         # Get rental start date
@@ -419,7 +419,7 @@ class PaymentsPage(QWidget):
             
         status_menu = menu.addMenu("Status")
         self._status_group = QActionGroup(self)
-        for s in ["All Statuses", "Paid", "Unpaid", "Overdue"]:
+        for s in ["All Statuses", "Paid", "Unpaid", "Overdue", "Void"]:
             act = status_menu.addAction(s)
             act.setCheckable(True)
             if s == "All Statuses": act.setChecked(True)

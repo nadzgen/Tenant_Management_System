@@ -108,6 +108,7 @@ class StatusBadge(QWidget):
         "Paid":        (T.SUCCESS, T.SUCCESS_SOFT),
         "Unpaid":      (T.WARNING, T.WARNING_SOFT),
         "Overdue":     (T.DANGER,  T.DANGER_SOFT),
+        "Void":        (T.TEXT_MUTED, T.DIVIDER),
         "Occupied":    (T.SUCCESS, T.SUCCESS_SOFT),
         "Full":        (T.SUCCESS, T.SUCCESS_SOFT),
         "Partially Occupied": (T.PURPLE, T.PURPLE_SOFT),
