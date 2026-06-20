@@ -24,7 +24,7 @@ from widgets.components import (
 
 
 class CustomDateSelector(QWidget):
-    def __init__(self, placeholder="14-06-2026", parent=None):
+    def __init__(self, placeholder="DD-MM-YYYY", parent=None):
         super().__init__(parent)
         self.setFixedHeight(42)
         
@@ -46,8 +46,6 @@ class CustomDateSelector(QWidget):
         
         self.line_edit = QLineEdit()
         self.line_edit.setPlaceholderText(placeholder)
-        self.line_edit.setReadOnly(True)
-        self.line_edit.setCursor(Qt.PointingHandCursor)
         self.line_edit.setStyleSheet(f"""
             QLineEdit {{
                 background: transparent;
@@ -56,7 +54,6 @@ class CustomDateSelector(QWidget):
                 font-size: 13px;
             }}
         """)
-        self.line_edit.mousePressEvent = lambda e: self._show_calendar()
         
         self.btn = QPushButton("▼")
         self.btn.setCursor(Qt.PointingHandCursor)
@@ -78,8 +75,6 @@ class CustomDateSelector(QWidget):
         self.layout.addWidget(self.bg_frame)
         
         self.btn.clicked.connect(self._show_calendar)
-        self.bg_frame.setCursor(Qt.PointingHandCursor)
-        self.bg_frame.mousePressEvent = lambda e: self._show_calendar()
         
     def _show_calendar(self):
         dialog = QDialog(self)
@@ -133,12 +128,19 @@ class CustomDateSelector(QWidget):
                 background-color: white;
                 color: #0F1B2D;
                 border: 1px solid #E2E8F0;
-                selection-background-color: #0F1B2D;
+                border-radius: 4px;
+                padding: 2px 4px;
+                selection-background-color: #2C6BFF;
+                min-width: 50px;
+            }
+            QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
+                width: 0px;
+                border: none;
             }
             QCalendarWidget QAbstractItemView:enabled {
                 color: #4A5568;
                 background-color: white;
-                selection-background-color: #0F1B2D;
+                selection-background-color: #2C6BFF;
                 selection-color: white;
                 border: none;
                 outline: none;
@@ -254,7 +256,7 @@ class OnboardingDialog(QDialog):
         self.f_name.textChanged.connect(lambda t: self.f_name.setStyleSheet(ok_style) if t.strip() else None)
         self.f_contact.textChanged.connect(lambda t: self.f_contact.setStyleSheet(ok_style) if t.strip() else None)
         
-        self.f_dob = CustomDateSelector("14-06-2026")
+        self.f_dob = CustomDateSelector("DD-MM-YYYY")
         
         self.f_sex = QComboBox()
         self.f_sex.addItems(["Female", "Male"])
@@ -349,7 +351,7 @@ class OnboardingDialog(QDialog):
         self.f_rent.setReadOnly(True)
         self.f_rent.setStyleSheet(f"background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT_MUTED}; font-size:13px;")
         
-        self.f_move_in = CustomDateSelector("14-06-2026")
+        self.f_move_in = CustomDateSelector("DD-MM-YYYY")
         
         # self.f_dob.setDate(QDate.currentDate())
         # self.f_move_in.setDate(QDate.currentDate())
@@ -503,6 +505,10 @@ class OnboardingDialog(QDialog):
         rent_str = self.f_rent.text().strip()
         if pay_rent and not rent_str.isdigit():
             QMessageBox.warning(self, "Required", "Valid Rent Amount is required if paying first month.")
+            return
+
+        if not self.f_move_in.date().isValid():
+            QMessageBox.warning(self, "Required", "Valid Move-in Date is required (dd-MM-yyyy).")
             return
 
         self.payment_data = {
