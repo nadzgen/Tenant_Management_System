@@ -108,7 +108,6 @@ class StatusBadge(QWidget):
         "Paid":        (T.SUCCESS, T.SUCCESS_SOFT),
         "Unpaid":      (T.WARNING, T.WARNING_SOFT),
         "Overdue":     (T.DANGER,  T.DANGER_SOFT),
-        "Void":        (T.TEXT_MUTED, T.DIVIDER),
         "Occupied":    (T.SUCCESS, T.SUCCESS_SOFT),
         "Full":        (T.SUCCESS, T.SUCCESS_SOFT),
         "Partially Occupied": (T.PURPLE, T.PURPLE_SOFT),
@@ -856,7 +855,7 @@ class PaginationControl(QWidget):
         self.btn_prev.setEnabled(self.current_page > 1)
         self.btn_next.setEnabled(self.current_page < self.total_pages)
 
-def table_action_cell(on_edit, on_delete) -> QWidget:
+def table_action_cell(on_edit, on_delete, delete_icon_name="trash", delete_tooltip="Delete") -> QWidget:
     """Create a cell containing modern Edit and Delete icon buttons."""
     wrap = QWidget()
     lay = QHBoxLayout(wrap)
@@ -878,10 +877,10 @@ def table_action_cell(on_edit, on_delete) -> QWidget:
     
     # Delete button
     del_btn = QPushButton()
-    del_btn.setIcon(make_icon("trash", "#F87171", 16))
+    del_btn.setIcon(make_icon(delete_icon_name, "#F87171", 16))
     del_btn.setFixedSize(30, 30)
     del_btn.setCursor(Qt.PointingHandCursor)
-    del_btn.setToolTip("Move Out / End Rent")
+    del_btn.setToolTip(delete_tooltip)
     del_btn.setStyleSheet(f"""
         QPushButton {{ background:transparent; border-radius:15px; border:none; }}
         QPushButton:hover {{ background:{T.DANGER_SOFT}; }}
