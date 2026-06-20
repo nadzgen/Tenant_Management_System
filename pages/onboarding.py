@@ -368,22 +368,43 @@ class OnboardingDialog(QDialog):
             self.f_contact.setStyleSheet(ok_style)
 
         dob = self.f_dob.date()
+        base_date_style = f"""
+            QDateEdit::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
+                border: none;
+            }}
+            QDateEdit::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
+            }}
+        """
         if not dob.isValid():
-            self.f_dob.bg_frame.setStyleSheet(f"""
-                QFrame {{
+            self.f_dob.setStyleSheet(f"""
+                QDateEdit {{
                     background: {T.BG};
                     border: 1.5px solid {T.DANGER};
                     border-radius: 10px;
+                    padding: 0 14px;
+                    color: {T.TEXT};
+                    font-size: 13px;
                 }}
+                {base_date_style}
             """)
             ok = False
         else:
-            self.f_dob.bg_frame.setStyleSheet(f"""
-                QFrame {{
+            self.f_dob.setStyleSheet(f"""
+                QDateEdit {{
                     background: {T.BG};
                     border: 1.5px solid {T.BORDER};
                     border-radius: 10px;
+                    padding: 0 14px;
+                    color: {T.TEXT};
+                    font-size: 13px;
                 }}
+                {base_date_style}
             """)
 
         if not ok:
