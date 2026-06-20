@@ -23,153 +23,34 @@ from widgets.components import (
 )
 
 
-class CustomDateSelector(QWidget):
-    def __init__(self, placeholder="DD-MM-YYYY", parent=None):
+class CustomDateSelector(QDateEdit):
+    def __init__(self, placeholder="DD/MM/YYYY", parent=None):
         super().__init__(parent)
+        self.setCalendarPopup(True)
         self.setFixedHeight(42)
-        
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)
-        
-        self.bg_frame = QFrame()
-        self.bg_frame.setStyleSheet(f"""
-            QFrame {{
+        self.setDisplayFormat("dd/MM/yyyy")
+        self.setDate(QDate.currentDate())
+        self.setStyleSheet(f"""
+            QDateEdit {{
                 background: {T.BG};
                 border: 1.5px solid {T.BORDER};
                 border-radius: 10px;
-            }}
-        """)
-        self.bg_layout = QHBoxLayout(self.bg_frame)
-        self.bg_layout.setContentsMargins(14, 0, 10, 0)
-        self.bg_layout.setSpacing(5)
-        
-        self.line_edit = QLineEdit()
-        self.line_edit.setPlaceholderText(placeholder)
-        self.line_edit.setStyleSheet(f"""
-            QLineEdit {{
-                background: transparent;
-                border: none;
+                padding: 0 14px;
                 color: {T.TEXT};
                 font-size: 13px;
             }}
-        """)
-        
-        self.btn = QPushButton("▼")
-        self.btn.setCursor(Qt.PointingHandCursor)
-        self.btn.setFixedSize(24, 24)
-        self.btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
+            QDateEdit::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 32px;
                 border: none;
-                color: {T.TEXT_MUTED};
-                font-size: 10px;
             }}
-            QPushButton:hover {{
-                color: {T.TEXT};
+            QDateEdit::down-arrow {{
+                image: url(assets/chevron-down.svg);
+                width: 16px;
+                height: 16px;
             }}
         """)
-        
-        self.bg_layout.addWidget(self.line_edit)
-        self.bg_layout.addWidget(self.btn)
-        self.layout.addWidget(self.bg_frame)
-        
-        self.btn.clicked.connect(self._show_calendar)
-        
-    def _show_calendar(self):
-        dialog = QDialog(self)
-        dialog.setWindowFlags(Qt.Popup)
-        dialog.setStyleSheet("QDialog { background: white; border: 1px solid #E2E8F0; border-radius: 8px; }")
-        
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        cal = QCalendarWidget()
-        cal.setStyleSheet("""
-            QCalendarWidget {
-                background-color: white;
-                border: none;
-                color: #0F1B2D;
-            }
-            QCalendarWidget QWidget {
-                alternate-background-color: #F6F8FB;
-                background-color: white;
-                color: #0F1B2D;
-            }
-            QCalendarWidget QToolButton {
-                color: #4A5568;
-                font-size: 11px;
-                font-weight: 500;
-                background-color: transparent;
-                border: none;
-                border-radius: 4px;
-            }
-            QCalendarWidget QToolButton#qt_calendar_prevmonth {
-                qproperty-icon: url(none);
-                qproperty-text: "‹";
-                qproperty-toolButtonStyle: 1;
-                font-size: 17px;
-            }
-            QCalendarWidget QToolButton#qt_calendar_nextmonth {
-                qproperty-icon: url(none);
-                qproperty-text: "›";
-                qproperty-toolButtonStyle: 1;
-                font-size: 17px;
-            }
-            QCalendarWidget QToolButton:hover {
-                background-color: #F6F8FB;
-            }
-            QCalendarWidget QMenu {
-                background-color: white;
-                color: #0F1B2D;
-                border: 1px solid #E2E8F0;
-            }
-            QCalendarWidget QSpinBox {
-                background-color: white;
-                color: #0F1B2D;
-                border: 1px solid #E2E8F0;
-                border-radius: 4px;
-                padding: 2px 4px;
-                selection-background-color: #2C6BFF;
-                min-width: 50px;
-            }
-            QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
-                width: 0px;
-                border: none;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                color: #4A5568;
-                background-color: white;
-                selection-background-color: #2C6BFF;
-                selection-color: white;
-                border: none;
-                outline: none;
-            }
-        """)
-        layout.addWidget(cal)
-        
-        def on_date_selected(date: QDate):
-            self.line_edit.setText(date.toString("dd-MM-yyyy"))
-            self.bg_frame.setStyleSheet(f"""
-                QFrame {{
-                    background: {T.BG};
-                    border: 1.5px solid {T.BORDER};
-                    border-radius: 10px;
-                }}
-            """)
-            dialog.accept()
-            
-        cal.clicked.connect(on_date_selected)
-        
-        pos = self.mapToGlobal(self.rect().bottomLeft())
-        dialog.move(pos.x(), pos.y() + 2)
-        dialog.exec()
-        
-    def date(self) -> QDate:
-        return QDate.fromString(self.line_edit.text(), "dd-MM-yyyy")
-        
-    def setDate(self, date: QDate):
-        self.line_edit.setText(date.toString("dd-MM-yyyy"))
 
 class StepIndicator(QWidget):
     """A visual breadcrumb/stepper showing current progress."""
@@ -256,7 +137,7 @@ class OnboardingDialog(QDialog):
         self.f_name.textChanged.connect(lambda t: self.f_name.setStyleSheet(ok_style) if t.strip() else None)
         self.f_contact.textChanged.connect(lambda t: self.f_contact.setStyleSheet(ok_style) if t.strip() else None)
         
-        self.f_dob = CustomDateSelector("DD-MM-YYYY")
+        self.f_dob = CustomDateSelector("DD/MM/YYYY")
         
         self.f_sex = QComboBox()
         self.f_sex.addItems(["Female", "Male"])
@@ -370,7 +251,7 @@ class OnboardingDialog(QDialog):
         self.f_rent.setReadOnly(True)
         self.f_rent.setStyleSheet(f"background:{T.BG}; border:1.5px solid {T.BORDER}; border-radius:10px; padding:0 14px; color:{T.TEXT_MUTED}; font-size:13px;")
         
-        self.f_move_in = CustomDateSelector("DD-MM-YYYY")
+        self.f_move_in = CustomDateSelector("DD/MM/YYYY")
         
         # self.f_dob.setDate(QDate.currentDate())
         # self.f_move_in.setDate(QDate.currentDate())
@@ -545,7 +426,7 @@ class OnboardingDialog(QDialog):
             return
 
         if not self.f_move_in.date().isValid():
-            QMessageBox.warning(self, "Required", "Valid Move-in Date is required (dd-MM-yyyy).")
+            QMessageBox.warning(self, "Required", "Valid Move-in Date is required (dd/MM/yyyy).")
             return
 
         self.payment_data = {
