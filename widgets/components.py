@@ -881,7 +881,7 @@ def table_action_cell(on_edit, on_delete) -> QWidget:
     del_btn.setIcon(make_icon("trash", "#F87171", 16))
     del_btn.setFixedSize(30, 30)
     del_btn.setCursor(Qt.PointingHandCursor)
-    del_btn.setToolTip("Delete")
+    del_btn.setToolTip("Move Out / End Rent")
     del_btn.setStyleSheet(f"""
         QPushButton {{ background:transparent; border-radius:15px; border:none; }}
         QPushButton:hover {{ background:{T.DANGER_SOFT}; }}
