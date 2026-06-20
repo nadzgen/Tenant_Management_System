@@ -310,6 +310,25 @@ class OnboardingDialog(QDialog):
         lay_room = QVBoxLayout()
         lay_room.setSpacing(12)
         
+        filter_lay = QHBoxLayout()
+        filter_lay.setContentsMargins(0, 0, 0, 0)
+        self.lbl_room_filter = QLabel()
+        self.lbl_room_filter.setFixedHeight(24)
+        self.lbl_room_filter.setStyleSheet(f"""
+            QLabel {{
+                background: {T.BG};
+                border: 1px solid {T.BORDER};
+                border-radius: 12px;
+                color: {T.PRIMARY};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 0 10px;
+            }}
+        """)
+        filter_lay.addWidget(self.lbl_room_filter)
+        filter_lay.addStretch(1)
+        lay_room.addLayout(filter_lay)
+        
         self.tbl_rooms = styled_table(["Room No.", "Type", "Occupancy", "Monthly Rent"])
         self.tbl_rooms.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tbl_rooms.setMinimumHeight(260)
@@ -378,10 +397,10 @@ class OnboardingDialog(QDialog):
         # ── Step 4: Summary ──
         self.w_sum = Card(padding=24)
         lay_sum = QVBoxLayout()
-        self.lbl_summary = QLabel()
-        self.lbl_summary.setStyleSheet(f"color:{T.TEXT}; font-size:14px; line-height: 1.6;")
-        self.lbl_summary.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        lay_sum.addWidget(self.lbl_summary)
+        self.summary_content = QVBoxLayout()
+        self.summary_content.setSpacing(12)
+        lay_sum.addLayout(self.summary_content)
+        lay_sum.addStretch(1)
         
         r4 = QHBoxLayout()
         btn_prev4 = ghost_button("Back")
@@ -403,7 +422,25 @@ class OnboardingDialog(QDialog):
 
     def _load_rooms(self):
         rooms = get_rooms()
-        self.avail_rooms = [r for r in rooms if r["status"] in ["Vacant", "Partially Occupied"]]
+        tenant_sex = self.tenant_data.get("sex")
+        
+        if hasattr(self, "lbl_room_filter"):
+            if tenant_sex:
+                self.lbl_room_filter.setText(f"✦ Filter: Vacant & {tenant_sex}-Only")
+                self.lbl_room_filter.show()
+            else:
+                self.lbl_room_filter.hide()
+                
+        self.avail_rooms = []
+        for r in rooms:
+            if r["status"] == "Vacant":
+                self.avail_rooms.append(r)
+            elif r["status"] == "Partially Occupied":
+                if tenant_sex and r.get("occupant_sex") == tenant_sex:
+                    self.avail_rooms.append(r)
+                elif not tenant_sex:
+                    self.avail_rooms.append(r)
+                    
         self.tbl_rooms.setRowCount(0)
         for r_data in self.avail_rooms:
             row = self.tbl_rooms.rowCount(); self.tbl_rooms.insertRow(row)
@@ -518,27 +555,65 @@ class OnboardingDialog(QDialog):
             "move_in": self.f_move_in.date().toString("yyyy-MM-dd")
         }
         
-        sum_html = f"""
-        <h3 style="color:{T.PRIMARY}; margin-bottom: 2px;">1. Tenant Information</h3>
-        <b>Name:</b> {self.tenant_data['name']}<br>
-        <b>Contact:</b> {self.tenant_data['contact']}<br>
+        # Clear existing summary layout
+        while self.summary_content.count():
+            item = self.summary_content.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        def make_card(title, data_pairs):
+            f = QFrame()
+            f.setStyleSheet(f"QFrame {{ background:{T.BG}; border:1px solid {T.BORDER}; border-radius:10px; }} QLabel {{ border:none; background:transparent; }}")
+            l = QVBoxLayout(f)
+            l.setContentsMargins(16, 14, 16, 14)
+            l.setSpacing(8)
+            t = QLabel(title)
+            t.setStyleSheet(f"color:{T.PRIMARY}; font-size:12px; font-weight:700; text-transform:uppercase;")
+            l.addWidget(t)
+            for k, v in data_pairs:
+                r = QHBoxLayout()
+                lk = QLabel(k)
+                lk.setStyleSheet(f"color:{T.TEXT_SUBTLE}; font-size:13px;")
+                lv = QLabel(str(v))
+                lv.setStyleSheet(f"color:{T.TEXT}; font-size:13px; font-weight:600;")
+                lv.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                r.addWidget(lk); r.addWidget(lv)
+                l.addLayout(r)
+            return f
+
+        self.summary_content.addWidget(make_card("1. Tenant Information", [
+            ("Name", self.tenant_data['name']),
+            ("Contact", self.tenant_data['contact'])
+        ]))
         
-        <br><h3 style="color:{T.PRIMARY}; margin-bottom: 2px;">2. Room Selection</h3>
-        <b>Room:</b> {self.room_data['number']} ({self.room_data['type']})<br>
-        <b>Rent:</b> ₱ {int(self.room_data['rent']):,}<br>
+        self.summary_content.addWidget(make_card("2. Room Selection", [
+            ("Room", f"{self.room_data['number']} ({self.room_data['type']})"),
+            ("Rent", f"₱ {int(self.room_data['rent']):,}")
+        ]))
         
-        <br><h3 style="color:{T.PRIMARY}; margin-bottom: 2px;">3. Initial Payments</h3>
-        <b>Deposit:</b> ₱ {self.payment_data['deposit']:,}<br>
-        """
+        pay_info = [("Deposit", f"₱ {self.payment_data['deposit']:,}")]
         if pay_rent:
-            sum_html += f"<b>1st Month Rent:</b> ₱ {self.payment_data['rent']:,} <span style='color:{T.TEXT_MUTED}'>(Move-in: {self.payment_data['move_in']})</span><br>"
+            pay_info.append(("1st Month Rent", f"₱ {self.payment_data['rent']:,}"))
+            pay_info.append(("Move-in Date", self.payment_data['move_in']))
         else:
-            sum_html += f"<b>Move-in Date:</b> {self.payment_data['move_in']} <span style='color:{T.WARNING}'>(Rent not paid yet)</span><br>"
+            pay_info.append(("Move-in Date", f"{self.payment_data['move_in']} (Rent pending)"))
             
-        total = self.payment_data['deposit'] + self.payment_data['rent']
-        sum_html += f"<br><b style='font-size: 16px;'>Total Due Today: ₱ {total:,}</b>"
+        self.summary_content.addWidget(make_card("3. Initial Payments", pay_info))
         
-        self.lbl_summary.setText(sum_html)
+        total = self.payment_data['deposit'] + self.payment_data['rent']
+        
+        tot_frame = QFrame()
+        tot_frame.setStyleSheet(f"QFrame {{ background:{T.SURFACE}; border:2px solid {T.PRIMARY}; border-radius:10px; }} QLabel {{ border:none; background:transparent; }}")
+        tot_lay = QHBoxLayout(tot_frame)
+        tot_lay.setContentsMargins(16, 16, 16, 16)
+        lbl_tot_text = QLabel("Total Due Today")
+        lbl_tot_text.setStyleSheet(f"color:{T.PRIMARY}; font-size:15px; font-weight:700;")
+        lbl_tot_val = QLabel(f"₱ {total:,}")
+        lbl_tot_val.setStyleSheet(f"color:{T.PRIMARY}; font-size:18px; font-weight:800;")
+        lbl_tot_val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        tot_lay.addWidget(lbl_tot_text); tot_lay.addWidget(lbl_tot_val)
+        
+        self.summary_content.addWidget(tot_frame)
         self._set_step(3)
 
     def _finish(self):
